@@ -27,9 +27,11 @@
 --         <every device field> = EXCLUDED.<field>, ...,
 --         deleted_at = NULL,
 --         updated_at = now()
---     WHERE <fact>.sync_id IS NULL OR EXCLUDED.sync_id >= <fact>.sync_id;
+--     WHERE <fact>.sync_id IS NULL OR EXCLUDED.sync_id > <fact>.sync_id
+--        OR <fact>.deleted_at IS NOT NULL;
 --
---   The WHERE stops an older replay overwriting a newer edit.
+--   The WHERE stops an older replay overwriting a newer edit, and makes the
+--   7-day re-sync window a no-op for records that have not changed.
 --
 -- * Deletes on the device are FLAGGED here (deleted_at), not removed. The
 --   sync compares the device's record set over a trailing window with ours
@@ -96,6 +98,11 @@ CREATE TABLE IF NOT EXISTS device_config_epoch (
     config_epoch   int         NOT NULL CHECK (config_epoch >= 1),
     effective_from timestamptz NOT NULL,
     counts_trusted boolean     NOT NULL DEFAULT false,
+    -- false = rows in this era are excluded by default from anything that
+    -- aggregates by shift or production day. Flagged, never deleted; the
+    -- app shows exclusion_reason wherever the exclusion applies.
+    usable         boolean     NOT NULL DEFAULT true,
+    exclusion_reason text,
     note           text,
     created_at     timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (device_id, config_epoch),
@@ -105,7 +112,8 @@ CREATE TABLE IF NOT EXISTS device_config_epoch (
 COMMENT ON TABLE device_config_epoch IS
     'Configuration eras. Rows are assigned an epoch by their own start_time, '
     'not by load time, so a backfill lands in the right era. counts_trusted '
-    'gates every count-based figure in the app.';
+    'gates every count-based figure in the app; usable gates whether the era '
+    'is included by default at all.';
 
 -- Resumption state. One row per device per channel.
 CREATE TABLE IF NOT EXISTS sync_state (
@@ -122,7 +130,7 @@ CREATE TABLE IF NOT EXISTS sync_state (
     backfill_completed_at timestamptz,         -- NULL until the first full pull finishes
     last_synced_at        timestamptz,         -- last attempt
     last_success_at       timestamptz,
-    last_window_from      timestamptz,         -- start of the last reconciled re-sync window
+    last_window_from_day  int,                 -- first production day of the last reconciled window
     rows_loaded           bigint      NOT NULL DEFAULT 0,
     rows_flagged_deleted  bigint      NOT NULL DEFAULT 0,
     last_error            text,
@@ -232,11 +240,6 @@ CREATE TABLE IF NOT EXISTS part_standard (
     sample_runs      int,
     ict_unstable     boolean GENERATED ALWAYS AS (ict_stddev > 0.05) STORED,
     ict_updated_at   timestamptz,
-    -- Pieces per cycle, from the device's part configuration (latest run on
-    -- each device). Converts per-cycle figures to per-piece. 0.0 or NULL
-    -- means not configured - the same root cause as the count defect.
-    expected_count_per_cycle double precision,
-    epc_inconsistent boolean,                    -- devices disagree on it for this part
     sap_standard     double precision,
     sap_unit         text CHECK (sap_unit IN ('s_per_piece', 'pieces_per_hour', 'hours_per_thousand')),
     -- SAP standard normalised to seconds per piece, whatever unit was entered.
@@ -248,12 +251,20 @@ CREATE TABLE IF NOT EXISTS part_standard (
         END) STORED,
     sap_updated_at   timestamptz,
     sap_updated_by   text,
+    -- Pieces per cycle, maintained by hand in the app. NULL = not configured.
+    -- Deliberately NOT read from the device: XL's expected_count_per_cycle is
+    -- 0.0 on every unit because it was never configured - the same root
+    -- cause as the count defect. If it is ever set correctly in XL
+    -- configuration, read it from there instead of this column.
+    expected_count_per_cycle double precision,
+    epc_updated_at   timestamptz,
+    epc_updated_by   text,
     updated_at       timestamptz NOT NULL DEFAULT now()
 );
 
 COMMENT ON COLUMN part_standard.ideal_cycle_time IS
     'Seconds per machine CYCLE, not per piece. SAP standards are per piece; '
-    'comparing them needs pieces per cycle, which needs trusted counts.';
+    'converting needs expected_count_per_cycle, entered by hand.';
 
 -- =========================================================== fact tables
 --
@@ -398,7 +409,6 @@ CREATE TABLE IF NOT EXISTS part_run (
     target_cycles         double precision,
     run_cycles            double precision,
     small_stops           double precision,
-    expected_count_per_cycle double precision,   -- device setting: pieces per cycle. 0.0 = unconfigured
     config_epoch          int    NOT NULL DEFAULT 1,
     deleted_at            timestamptz,
     first_loaded_at       timestamptz NOT NULL DEFAULT now(),
@@ -430,7 +440,6 @@ CREATE TABLE IF NOT EXISTS job_run (
     target_cycles         double precision,
     run_cycles            double precision,
     small_stops           double precision,
-    expected_count_per_cycle double precision,   -- device setting: pieces per cycle. 0.0 = unconfigured
     config_epoch          int    NOT NULL DEFAULT 1,
     deleted_at            timestamptz,
     first_loaded_at       timestamptz NOT NULL DEFAULT now(),
@@ -566,10 +575,9 @@ CREATE TRIGGER device_seed_epoch
 
 -- ========================================================= part standards
 
--- Derived ideal cycle time per part, over runs with run_cycles > 200, and
--- the device's pieces-per-cycle setting from the latest run of the part on
--- each device. Called by the sync at the end of each run. Never touches the
--- sap_* columns.
+-- Derived ideal cycle time per part, over runs with run_cycles > 200.
+-- Called by the sync at the end of each run. Never touches the manually
+-- maintained columns (sap_*, expected_count_per_cycle).
 CREATE OR REPLACE FUNCTION refresh_part_standard() RETURNS int
 LANGUAGE sql AS $$
     WITH derived AS (
@@ -580,37 +588,17 @@ LANGUAGE sql AS $$
           FROM part_run
          WHERE deleted_at IS NULL AND part IS NOT NULL AND run_cycles > 200
          GROUP BY part
-    ), latest AS (
-        SELECT DISTINCT ON (part, device_id) part, device_id, expected_count_per_cycle AS epc
-          FROM part_run
-         WHERE deleted_at IS NULL AND part IS NOT NULL
-         ORDER BY part, device_id, end_time DESC NULLS LAST
-    ), epc AS (
-        SELECT part,
-               CASE WHEN min(epc) = max(epc) THEN min(epc) END AS epc,
-               min(epc) IS DISTINCT FROM max(epc)              AS inconsistent
-          FROM latest GROUP BY part
-    ), merged AS (
-        SELECT part, d.ict, d.sd, d.n, e.epc, e.inconsistent
-          FROM derived d FULL JOIN epc e USING (part)
     ), up AS (
-        INSERT INTO part_standard AS ps
-               (part, ideal_cycle_time, ict_stddev, sample_runs,
-                expected_count_per_cycle, epc_inconsistent, ict_updated_at)
-        SELECT part, ict, sd, n, epc, inconsistent, now() FROM merged
+        INSERT INTO part_standard AS ps (part, ideal_cycle_time, ict_stddev, sample_runs, ict_updated_at)
+        SELECT part, ict, sd, n, now() FROM derived
         ON CONFLICT (part) DO UPDATE SET
-            ideal_cycle_time         = EXCLUDED.ideal_cycle_time,
-            ict_stddev               = EXCLUDED.ict_stddev,
-            sample_runs              = EXCLUDED.sample_runs,
-            expected_count_per_cycle = EXCLUDED.expected_count_per_cycle,
-            epc_inconsistent         = EXCLUDED.epc_inconsistent,
-            ict_updated_at           = EXCLUDED.ict_updated_at,
-            updated_at               = now()
-        WHERE (ps.ideal_cycle_time, ps.ict_stddev, ps.sample_runs,
-               ps.expected_count_per_cycle, ps.epc_inconsistent)
-              IS DISTINCT FROM
-              (EXCLUDED.ideal_cycle_time, EXCLUDED.ict_stddev, EXCLUDED.sample_runs,
-               EXCLUDED.expected_count_per_cycle, EXCLUDED.epc_inconsistent)
+            ideal_cycle_time = EXCLUDED.ideal_cycle_time,
+            ict_stddev       = EXCLUDED.ict_stddev,
+            sample_runs      = EXCLUDED.sample_runs,
+            ict_updated_at   = EXCLUDED.ict_updated_at,
+            updated_at       = now()
+        WHERE (ps.ideal_cycle_time, ps.ict_stddev, ps.sample_runs)
+              IS DISTINCT FROM (EXCLUDED.ideal_cycle_time, EXCLUDED.ict_stddev, EXCLUDED.sample_runs)
         RETURNING 1
     )
     SELECT count(*)::int FROM up
@@ -657,9 +645,12 @@ SELECT
         / NULLIF(sum(run_time + unplanned_stop_time + planned_stop_time) FILTER (WHERE is_full_hour), 0)
                                                                    AS availability_full_hours_only,
     sum(ideal_time) FILTER (WHERE is_full_hour)
-        / NULLIF(sum(run_time) FILTER (WHERE is_full_hour), 0)     AS performance_full_hours_only
-FROM hour_record
-WHERE deleted_at IS NULL
+        / NULLIF(sum(run_time) FILTER (WHERE is_full_hour), 0)     AS performance_full_hours_only,
+    bool_and(COALESCE(e.usable, true))                             AS usable,
+    string_agg(DISTINCT e.exclusion_reason, '; ')                  AS exclusion_reason
+FROM hour_record h
+LEFT JOIN device_config_epoch e USING (device_id, config_epoch)
+WHERE h.deleted_at IS NULL
 GROUP BY device_id, production_day_number;
 
 COMMENT ON VIEW daily_time_accounting IS
@@ -667,6 +658,31 @@ COMMENT ON VIEW daily_time_accounting IS
     'performance over full hours only. Utilization will read lower than the '
     'notebook report, which excluded not-scheduled blocks. quality, oee and '
     'teep are deliberately absent: they depend on counts (BRIEF section 4).';
+
+-- Where each device's usable history begins: the production day after the
+-- last day touched by an unusable epoch. The app defaults every page to
+-- fleet_window - the intersection of all four devices' usable history,
+-- since cross-line comparison is the main use - and lets the user widen it
+-- per device. Any widened view must show exclusion_reason, e.g. "FR8 before
+-- 2026-02-23: device clock was on Central time, so shift and production-day
+-- boundaries are an hour off on a Toronto clock."
+CREATE OR REPLACE VIEW usable_history AS
+SELECT d.device_id,
+       (SELECT max(h.production_day_number) + 1
+          FROM hour_record h JOIN device_config_epoch e USING (device_id, config_epoch)
+         WHERE h.device_id = d.device_id AND NOT e.usable AND h.deleted_at IS NULL) AS first_usable_day,
+       (SELECT max(production_day_number) FROM hour_record h
+         WHERE h.device_id = d.device_id AND h.deleted_at IS NULL)                  AS last_day,
+       (SELECT string_agg(exclusion_reason, '; ') FROM device_config_epoch e
+         WHERE e.device_id = d.device_id AND NOT e.usable)                          AS exclusion_reason
+FROM device d;
+
+CREATE OR REPLACE VIEW fleet_window AS
+SELECT max(COALESCE(first_usable_day, 0))    AS from_day,
+       production_day(max(COALESCE(first_usable_day, 0))) AS from_production_day,
+       min(last_day)                          AS to_day,
+       production_day(min(last_day))          AS to_production_day
+FROM usable_history;
 
 -- Downtime Pareto source. Both stop types, so the line page can show
 -- unplanned reasons and planned stops as separate tables. The cumulative
@@ -680,9 +696,11 @@ SELECT
     COALESCE(process_state_reason_display_name, process_state_reason, 'Unassigned') AS reason,
     count(*)                 AS events,
     sum(duration_s) / 3600.0 AS hours,
-    avg(duration_s) / 60.0   AS mean_minutes
-FROM state_event
-WHERE deleted_at IS NULL
+    avg(duration_s) / 60.0   AS mean_minutes,
+    bool_and(COALESCE(e.usable, true)) AS usable
+FROM state_event s
+LEFT JOIN device_config_epoch e USING (device_id, config_epoch)
+WHERE s.deleted_at IS NULL
   AND performance_impact IN ('unplanned_stop', 'planned_stop')
 GROUP BY device_id, production_day_number, performance_impact,
          process_state_reason, process_state_reason_display_name;
@@ -695,18 +713,20 @@ SELECT
     process_state,
     performance_impact,
     count(*)                 AS events,
-    sum(duration_s) / 3600.0 AS hours
-FROM state_event
-WHERE deleted_at IS NULL
+    sum(duration_s) / 3600.0 AS hours,
+    bool_and(COALESCE(e.usable, true)) AS usable
+FROM state_event s
+LEFT JOIN device_config_epoch e USING (device_id, config_epoch)
+WHERE s.deleted_at IS NULL
 GROUP BY device_id, production_day_number, process_state, performance_impact;
 
 -- Products page. Per-cycle figures are the trustworthy primary.
 --
--- Per-cycle vs per-piece is a units problem: the device's
--- expected_count_per_cycle converts one to the other, and it is currently
--- 0.0 (unconfigured) - the same root cause as the count defect. So:
+-- Per-cycle vs per-piece is a units problem: pieces per cycle converts one
+-- to the other. XL was never told it (0.0 on every device - the same root
+-- cause as the count defect), so it is entered by hand in part_standard.
 --   sap_s_per_cycle        SAP's per-piece standard converted with that
---                          setting; NULL until it is configured
+--                          value; NULL until someone enters it
 --   *_per_piece, good_count  from counts, so only from counts_trusted epochs
 --   sap_comparison_status  drives the UI state. For
 --                          'pieces_per_cycle_not_configured' show "SAP
@@ -733,16 +753,15 @@ SELECT
     ps.sample_runs                                        AS ict_sample_runs,
     ps.ict_unstable,
     ps.expected_count_per_cycle,
-    ps.epc_inconsistent,
     ps.sap_standard,
     ps.sap_unit,
     ps.sap_s_per_piece,
-    CASE WHEN ps.expected_count_per_cycle > 0 AND NOT ps.epc_inconsistent
+    CASE WHEN ps.expected_count_per_cycle > 0
          THEN ps.sap_s_per_piece * ps.expected_count_per_cycle END     AS sap_s_per_cycle,
     CASE
         WHEN ps.sap_s_per_piece IS NULL                        THEN 'no_sap_standard'
-        WHEN ps.epc_inconsistent                               THEN 'pieces_per_cycle_inconsistent'
-        WHEN COALESCE(ps.expected_count_per_cycle, 0) <= 0     THEN 'pieces_per_cycle_not_configured'
+        WHEN ps.expected_count_per_cycle IS NULL
+          OR ps.expected_count_per_cycle <= 0                   THEN 'pieces_per_cycle_not_configured'
         ELSE 'available'
     END                                                   AS sap_comparison_status,
     count(*) FILTER (WHERE r.counts_trusted)              AS runs_with_trusted_counts,
@@ -793,6 +812,15 @@ CROSS JOIN LATERAL (VALUES
          format('good %s > in %s', f.good_count, f.in_count)),
     ('performance_gt_1', f.ideal_time > f.run_time AND f.run_time > 0,
          format('performance %s - wrong ideal cycle time for this part', round((f.ideal_time / NULLIF(f.run_time, 0))::numeric, 3))),
+    -- reject_count equals in - good everywhere else; these rows are the
+    -- ones the count defect does not explain. Working hypothesis: counts
+    -- keyed in by hand. In = 0 or 1 alongside thousands good is not
+    -- something a sensor produces, two have reject at exactly half of
+    -- in - good, and all have near-zero run time. Unconfirmed: Vorne has
+    -- been asked whether XL logs count adjustments. Do not model it yet.
+    ('suspected_manual_count_entry', abs(f.reject_count - (f.in_count - f.good_count)) > 1e-6,
+         format('in %s, good %s, reject %s: off by %s', f.in_count, f.good_count, f.reject_count,
+                f.in_count - f.good_count - f.reject_count)),
     ('count_adjustment', f.is_count_adjustment,
          format('reject %s = -good, run_time 0', f.reject_count)),
     ('acct_gap',         f.is_full_hour AND abs(f.acct_gap_s) > 180,
@@ -896,20 +924,20 @@ GRANT SELECT, INSERT, UPDATE ON
     TO xl_sync;
 GRANT SELECT ON device_config_epoch TO xl_sync;            -- epochs are set by a human
 GRANT SELECT ON part_standard TO xl_sync;
-GRANT INSERT (part, ideal_cycle_time, ict_stddev, sample_runs, expected_count_per_cycle,
-              epc_inconsistent, ict_updated_at, updated_at)
+GRANT INSERT (part, ideal_cycle_time, ict_stddev, sample_runs, ict_updated_at, updated_at)
     ON part_standard TO xl_sync;
-GRANT UPDATE (ideal_cycle_time, ict_stddev, sample_runs, expected_count_per_cycle,
-              epc_inconsistent, ict_updated_at, updated_at)
+GRANT UPDATE (ideal_cycle_time, ict_stddev, sample_runs, ict_updated_at, updated_at)
     ON part_standard TO xl_sync;
 GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO xl_sync;
 GRANT EXECUTE ON FUNCTION refresh_part_standard() TO xl_sync;
 
 -- Flask app.
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO xl_reader;   -- includes views
-GRANT INSERT (part, sap_standard, sap_unit, sap_updated_at, sap_updated_by, updated_at)
+GRANT INSERT (part, sap_standard, sap_unit, sap_updated_at, sap_updated_by,
+              expected_count_per_cycle, epc_updated_at, epc_updated_by, updated_at)
     ON part_standard TO xl_reader;
-GRANT UPDATE (sap_standard, sap_unit, sap_updated_at, sap_updated_by, updated_at)
+GRANT UPDATE (sap_standard, sap_unit, sap_updated_at, sap_updated_by,
+              expected_count_per_cycle, epc_updated_at, epc_updated_by, updated_at)
     ON part_standard TO xl_reader;
 
 -- ================================================================ devices
@@ -920,6 +948,21 @@ INSERT INTO device (device_id, host) VALUES
     ('AreaD', '10.15.22.95'),
     ('AreaE', '10.15.22.119')
 ON CONFLICT (device_id) DO NOTHING;
+
+-- Epoch 1 on every device is the era before its clock was on Eastern time,
+-- found from the UTC offsets in shift_hour history. Epoch 2 starts at the
+-- first record carrying the corrected offset. Counts stay untrusted.
+UPDATE device_config_epoch
+   SET usable = false,
+       exclusion_reason = 'device clock not on America/Toronto: shift and production-day boundaries are offset'
+ WHERE config_epoch = 1 AND device_id IN ('FR8', 'AreaB', 'AreaD', 'AreaE');
+
+INSERT INTO device_config_epoch (device_id, config_epoch, effective_from, counts_trusted, usable, note) VALUES
+    ('FR8',   2, '2026-02-23 14:00:00+00',        false, true, 'clock moved from Central (-06:00) to Eastern'),
+    ('AreaB', 2, '2026-03-25 17:38:06.684485+00', false, true, 'clock set to Eastern after first hours on -05:00'),
+    ('AreaD', 2, '2026-03-26 18:00:00+00',        false, true, 'clock set to Eastern after first hours on -05:00'),
+    ('AreaE', 2, '2026-04-01 17:00:00+00',        false, true, 'clock set to Eastern after first hours on -05:00')
+ON CONFLICT DO NOTHING;
 
 COMMIT;
 
@@ -933,10 +976,10 @@ COMMIT;
 -- Configuration fixed on a device (e.g. Vorne corrects FR8's part setup):
 --
 --   INSERT INTO device_config_epoch (device_id, config_epoch, effective_from, counts_trusted, note)
---   VALUES ('FR8', 2, '2026-11-02 07:00 America/Toronto', true, 'part config corrected by Vorne, ticket #...');
+--   VALUES ('FR8', 3, '2026-11-02 07:00 America/Toronto', true, 'part config corrected by Vorne, ticket #...');
 --
 --   Every FR8 fact row is re-stamped automatically by start_time. Rows
---   before that moment stay epoch 1 and untrusted. To check:
+--   before that moment keep their earlier epoch and stay untrusted. To check:
 --
 --   SELECT config_epoch, count(*), min(start_time), max(start_time)
 --     FROM hour_record WHERE device_id = 'FR8' GROUP BY 1 ORDER BY 1;

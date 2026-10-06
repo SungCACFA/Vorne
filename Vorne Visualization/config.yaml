@@ -1,0 +1,43 @@
+# Devices and channels to sync. Credentials, when a database target exists,
+# go in .env - never here.
+
+cache_path: cache/xl_cache.db
+
+sync:
+  window_days: 7          # trailing production days re-pulled every run
+  page_size: 1000         # records per request during backfill
+  max_delete_fraction: 0.2
+
+# Channels per BRIEF section 3. `instant` is deprecated - do not add it.
+channels: [shift_hour, shift, process_state, part, job, quality_event]
+
+devices:
+  - {id: FR8,   host: 10.15.22.19}
+  - {id: AreaB, host: 10.15.22.83}
+  - {id: AreaD, host: 10.15.22.95}
+  - {id: AreaE, host: 10.15.22.119}
+
+# Configuration epochs, assigned to each row by its own start_time. These
+# mirror the seed rows at the end of schema.sql; once Postgres exists, its
+# device_config_epoch table is the source of truth.
+#
+# Epoch 1 on every device is the era before its clock was on Eastern time
+# (found from the UTC offsets in shift_hour history). Its rows are kept but
+# excluded by default from anything aggregating by shift or production day.
+epochs:
+  FR8:
+    - {epoch: 1, from: "-infinity", usable: false,
+       exclusion_reason: "Before 2026-02-23 the device clock was on Central time (-06:00): shift and production-day boundaries are an hour off on a Toronto clock."}
+    - {epoch: 2, from: "2026-02-23T14:00:00+00:00", note: "clock moved from Central to Eastern"}
+  AreaB:
+    - {epoch: 1, from: "-infinity", usable: false,
+       exclusion_reason: "First hours after installation were recorded on -05:00 before the clock was set to Eastern."}
+    - {epoch: 2, from: "2026-03-25T17:38:06.684485+00:00", note: "clock set to Eastern"}
+  AreaD:
+    - {epoch: 1, from: "-infinity", usable: false,
+       exclusion_reason: "First hours after installation were recorded on -05:00 before the clock was set to Eastern."}
+    - {epoch: 2, from: "2026-03-26T18:00:00+00:00", note: "clock set to Eastern"}
+  AreaE:
+    - {epoch: 1, from: "-infinity", usable: false,
+       exclusion_reason: "First hours after installation were recorded on -05:00 before the clock was set to Eastern."}
+    - {epoch: 2, from: "2026-04-01T17:00:00+00:00", note: "clock set to Eastern"}

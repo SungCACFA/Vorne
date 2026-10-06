@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% from "_macros.html" import stack, rate_heads, perf, key, spark, counts_flag, methodology %}
+
+{% macro reason_table(rows, colour, title, lead) -%}
+{% if rows %}
+{%- set mx = rows[0].seconds or 1 -%}
+<h2>{{ title }}</h2><p class=note>{{ lead }}</p>
+<table><thead><tr><th>Reason</th><td class=bar></td><td>Hours</td><td>Events</td><td>Avg min</td><td>Cumulative</td></tr></thead>
+<tbody>
+{% for r in rows[:20] %}
+<tr><th>{{ r.reason }}</th><td class=bar><i style="width:{{ '%.2f'|format(r.seconds / mx * 100) }}%;background:var(--{{ colour }})"></i></td>
+<td>{{ r.seconds|hrs }}</td><td>{{ '{:,}'.format(r.events) }}</td><td>{{ (r.seconds / r.events)|mins }}</td>
+<td>{{ '%.0f'|format(r.cumulative * 100) }}%</td></tr>
+{% endfor %}
+{% if rows|length > 20 %}{% set rest = rows[20:] %}
+<tr><th class=muted>{{ rest|length }} more reason{{ 's' if rest|length > 1 }}</th><td class=bar></td>
+<td>{{ rest|sum(attribute='seconds')|hrs }}</td><td>{{ '{:,}'.format(rest|sum(attribute='events')) }}</td><td></td><td>100%</td></tr>
+{% endif %}
+</tbody></table>
+{% endif %}
+{%- endmacro %}
+
+{% block title %}{{ dev }} · Danbro packaging{% endblock %}
+{% block sub %}{{ dev }} · {{ win.period_label }}{% endblock %}
+
+{% block body %}
+{% if not t.records %}
+<p class=empty>No records for this line in this period.</p>
+{% else %}
+{% set down_events = unplanned|sum(attribute='events') %}
+<h2>{{ dev }} at a glance</h2>
+<table><thead><tr><td class=bar>Share of elapsed time</td>{{ rate_heads() }}<td>Scheduled h</td><td>Down h</td><td>Down events</td></tr></thead>
+<tbody><tr><td class=bar>{{ stack(t) }}</td><td>{{ t.availability|pc }}</td><td>{{ perf(t.performance) }}</td>
+<td>{{ t.utilization|pc }}</td><td>{{ t.sched|hrs }}</td><td>{{ t.unp|hrs }}</td><td>{{ '{:,}'.format(down_events) }}</td></tr></tbody>
+</table>
+{{ key() }}
+
+<h2>Hours by activity</h2>
+<p class=note>What the line was doing, and whether it counts against availability.</p>
+<table><thead><tr><th>Activity</th><td class=bar></td><td>Counts as</td><td>Hours</td><td>Events</td><td>Avg min</td></tr></thead>
+<tbody>
+{% for a in acts %}
+<tr><th>{{ a.state|words }}</th>
+<td class=bar><i style="width:{{ '%.2f'|format(a.seconds / acts_total * 100) }}%;background:var(--{{ impact_colour.get(a.impact, 'nsc') }})"></i></td>
+<td>{{ a.impact|words }}</td><td>{{ a.seconds|hrs }}</td><td>{{ '{:,}'.format(a.events) }}</td><td>{{ (a.seconds / a.events)|mins }}</td></tr>
+{% endfor %}
+</tbody></table>
+
+{{ reason_table(unplanned, 'unp', 'Why it stopped',
+   'Unplanned stops ranked by hours lost. Many short events point to a nuisance problem; few long ones point to a process or parts problem.') }}
+{{ reason_table(planned, 'pln', 'Planned stops',
+   'Changeover, maintenance and setup: planned, but still time the line was not producing.') }}
+
+<h2>Availability, production day by production day</h2>
+<p class=note>One bar per production day (starting 07:00). Full height means the line ran for all the time it was scheduled.</p>
+{{ spark(dev, day_spark) }}
+
+<h2>Hour by hour</h2>
+<p class=note>What ran in each scheduled hour, newest first. Performance is ideal time over run time for that hour
+alone. {% if changeovers %}<strong>{{ changeovers }}</strong> hour{{ 's' if changeovers != 1 }} here span a part
+changeover: the device reports every part (and job) that ran in the hour, shown separated by a slash in the order
+the device lists them.{% endif %}
+{% if bad_perf %}<strong class=bad>{{ bad_perf }}</strong> hour{{ 's' if bad_perf != 1 }} show performance above 100%,
+which means the ideal cycle time configured for that part is wrong, not that the machine ran fast.{% endif %}</p>
+<div class=scroll><table class=hours><thead><tr><th>Production day</th><td>Hour</td><td>Shift</td><td>Part</td><td>Job</td>
+<td>Run min</td><td>Down min</td><td>Planned min</td><td>Perf</td></tr></thead>
+<tbody>
+{% for h in hours[:500] %}
+<tr{% if h.part and ',' in h.part %} class=changeover{% endif %}><th>{{ h.day|pday }}</th>
+<td>{{ h.start|clock }}–{{ h.end|clock }}{% if not h.full %} <small class=muted title="Partial record: not a full hour">partial</small>{% endif %}</td>
+<td>{{ h.shift|multi('shift change') }}</td><td>{{ h.part|multi }}</td><td>{{ h.job|multi }}</td>
+<td>{{ h.run|mins }}</td><td>{{ h.unp|mins }}</td><td>{{ h.pln|mins }}</td><td>{{ perf(h.performance) }}</td></tr>
+{% endfor %}
+</tbody></table></div>
+{% if hours|length > 500 %}<p class=note>Showing the newest 500 of {{ '{:,}'.format(hours|length) }} scheduled hours. Pick a shorter period to see the rest.</p>{% endif %}
+{% endif %}
+
+{{ counts_flag() }}
+{% endblock %}
+
+{% block footer %}
+{{ methodology(snap, [dev]) }}
+<p>Calendar use is not the earlier report's "Utilised"; see the overview footer. Production days start at 07:00.
+Activity and stop hours come from the device's own state records, so they cover whole state events and can
+differ slightly from the hour-record totals at the edges of a period.</p>
+{% endblock %}

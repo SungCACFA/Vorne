@@ -1,0 +1,18 @@
+<!doctype html><html lang=en><meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>{% block title %}Danbro packaging{% endblock %}</title>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;600;800&display=swap" rel=stylesheet>
+<link rel=stylesheet href="{{ url_for('static', filename='style.css') }}">
+<div class=wrap>
+<h1>Danbro packaging</h1>
+<p class=sub>{% block sub %}{% endblock %}</p>
+<nav>
+  <a href="{{ url_for('overview') }}{{ win.query() }}"{% if page == 'overview' %} aria-current=page{% endif %}>Overview</a>
+  {% for d in snap.devices %}<a href="{{ url_for('line', dev=d) }}{{ win.query() }}"{% if page == d %} aria-current=page{% endif %}>{{ d }}</a>{% endfor %}
+</nav>
+{% include "_controls.html" %}
+{% include "_exclusion.html" %}
+{% block body %}{% endblock %}
+<footer>{% block footer %}{% endblock %}</footer>
+</div>
+</html>

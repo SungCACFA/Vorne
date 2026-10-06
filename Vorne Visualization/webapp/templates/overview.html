@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% from "_macros.html" import stack, rate_heads, perf, key, spark, counts_flag, methodology %}
+
+{% block sub %}Where the time went · {{ win.period_label }} · four packaging lines{% endblock %}
+
+{% block body %}
+<h2>Time accounting</h2>
+<p class=note>Every second lands in one of four buckets, and they add to elapsed time within rounding.
+That reconciliation is what makes the rates below dependable.</p>
+{% if not rows %}
+<p class=empty>No records in this period.</p>
+{% else %}
+<table>
+<thead><tr><th>Line</th><td class=bar>Share of elapsed time</td>{{ rate_heads() }}<td>Scheduled h</td><td>Down h</td></tr></thead>
+<tbody>
+{% for dev, t in rows %}
+<tr><th><a class=lnk href="{{ url_for('line', dev=dev) }}{{ win.query() }}">{{ dev }}</a></th><td class=bar>{{ stack(t) }}</td>
+<td>{{ t.availability|pc }}</td><td>{{ perf(t.performance) }}</td><td>{{ t.utilization|pc }}</td>
+<td>{{ t.sched|hrs }}</td><td>{{ t.unp|hrs }}</td></tr>
+{% endfor %}
+</tbody>
+<tfoot><tr><th>{{ 'All four' if rows|length == 4 else (rows|length ~ (' line' if rows|length == 1 else ' lines') ~ ' with data') }}</th>
+<td class=bar>{{ stack(fleet) }}</td><td>{{ fleet.availability|pc }}</td><td>{{ perf(fleet.performance) }}</td>
+<td>{{ fleet.utilization|pc }}</td><td>{{ fleet.sched|hrs }}</td><td>{{ fleet.unp|hrs }}</td></tr></tfoot>
+</table>
+{{ key() }}
+
+<h2>Availability, production day by production day</h2>
+<p class=note>One bar per production day (starting 07:00). Full height means the line ran for all the time it was
+scheduled. A day with nothing scheduled shows as a stub.</p>
+{% for dev in snap.devices if dev in sparks %}{{ spark(dev, sparks[dev]) }}{% endfor %}
+{% endif %}
+
+{{ counts_flag() }}
+{% endblock %}
+
+{% block footer %}
+{{ methodology(snap, snap.devices) }}
+<p><strong>Calendar use is a different measure from the earlier report's "Utilised".</strong> That column was
+computed from full hours only, which dropped the overnight not-scheduled blocks, so it measured how much of the
+remaining time was scheduled rather than how much of the calendar was.
+{% if rows %}For {{ win.period_label }}, calendar use is {{ fleet.utilization|pc }}; the old method gives
+{{ fleet.utilization_full_hours_only|pc }}.{% endif %}</p>
+<p>Production days start at 07:00 and are labelled as production days, not calendar dates.
+Piece counts are excluded; see the note above.</p>
+{% endblock %}

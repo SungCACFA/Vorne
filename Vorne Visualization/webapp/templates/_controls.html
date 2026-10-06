@@ -1,0 +1,21 @@
+<form class=ctrl method=get action="{{ request.path }}">
+  <div class=seg role=group aria-label="Granularity">
+    {% for k, l in grans %}<button name=g value="{{ k }}" aria-pressed="{{ 'true' if k == win.gran else 'false' }}">{{ l }}</button>{% endfor %}
+  </div>
+  {# Sent only when the period or a widen box changes, so a granularity button wins. #}
+  <input type=hidden name=g value="{{ win.gran }}" disabled id=gkeep>
+  <label class=sr for=period>Period</label>
+  <select id=period name=p onchange="document.getElementById('gkeep').disabled=false;this.form.submit()">
+    {% for k, l in win.periods %}<option value="{{ k }}"{% if k == win.period %} selected{% endif %}>{{ l }}</option>{% endfor %}
+  </select>
+  <span>{{ period_days|length }} production day{{ '' if period_days|length == 1 else 's' }}</span>
+  <div class=widen>
+    <span>Widen history:</span>
+    {% for d in snap.devices %}
+      {% if d in panel_devices %}
+      <label><input type=checkbox name=widen value="{{ d }}"{% if d in win.widen %} checked{% endif %}
+        onchange="document.getElementById('gkeep').disabled=false;this.form.submit()">{{ d }}</label>
+      {% elif d in win.widen %}<input type=hidden name=widen value="{{ d }}">{% endif %}
+    {% endfor %}
+  </div>
+</form>

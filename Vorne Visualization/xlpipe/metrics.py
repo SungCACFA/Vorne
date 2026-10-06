@@ -189,3 +189,20 @@ def positional_events(payload: Any, fields: list[str]) -> list[dict[str, Any]]:
             raise ValueError(f"event has {got} values for {len(fields)} requested fields")
         out.append(dict(zip(fields, row)))
     return out
+
+
+def unwrap_values(payload: Any) -> dict[str, Any]:
+    """api/v0/device wraps every value: {"asset_name": {"metadata": {...},
+    "value": "FR8"}}. Unwrap the envelope, then each value."""
+    data, _ = unwrap(payload)
+    if not isinstance(data, dict):
+        return {}
+    return {
+        k: (v.get("value") if isinstance(v, dict) and "value" in v else v)
+        for k, v in data.items()
+    }
+
+
+def utc_iso(value: datetime | None) -> str | None:
+    """Store UTC; convert to plant time only on display."""
+    return value.astimezone(timezone.utc).isoformat() if value is not None else None

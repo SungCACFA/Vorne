@@ -1,0 +1,14 @@
+<div class="flag info">
+  <p><strong>Production days from {{ win.fleet_from|pday }} onward</strong>: the span where all four lines have usable
+  history, so they can be compared like for like. Earlier records are kept but hidden. Tick a line under
+  "Widen history" to include its own earlier usable days; records from before its clock was corrected are
+  always excluded.</p>
+  <ul>
+  {% for d in panel_devices %}{% set h = snap.history[d] %}
+    <li><strong>{{ d }}</strong> usable from {{ h.first_usable_day|pday }}{% if d in win.widen %}, widened to include it{% endif %}.
+    {{ h.exclusions|join(' ') }}</li>
+  {% endfor %}
+  </ul>
+  {% if win.widen and page == 'overview' %}<p>With lines widened, a period before {{ win.fleet_from|pday }} compares
+  different sets of lines, and the fleet total covers only the lines with data in it.</p>{% endif %}
+</div>

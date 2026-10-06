@@ -1,0 +1,63 @@
+:root{--ink:#15191B;--mute:#5A6368;--rule:#DADFE1;--panel:#F4F6F6;
+--run:#1F6F5C;--unp:#B3261E;--pln:#C98A0B;--nsc:#B9C0C4}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:var(--ink);
+font:400 16px/1.5 'Libre Franklin',system-ui,sans-serif;font-variant-numeric:tabular-nums}
+.wrap{max-width:1080px;margin:0 auto;padding:48px 24px 96px}
+h1{font-weight:800;font-size:clamp(26px,4vw,40px);letter-spacing:-.02em;margin:0 0 4px}
+.sub{color:var(--mute);margin:0 0 28px}
+nav{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--rule);margin-bottom:24px}
+nav button{background:none;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;
+padding:9px 12px;font:inherit;font-weight:600;color:var(--mute);cursor:pointer}
+nav button[aria-current=page]{color:var(--ink);border-bottom-color:var(--ink)}
+nav button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.ctrl{display:flex;gap:14px;align-items:center;flex-wrap:wrap;background:var(--panel);
+padding:12px 14px;margin-bottom:8px}
+.seg{display:flex;border:1px solid var(--rule);background:#fff}
+.seg button{background:none;border:0;padding:7px 13px;font:inherit;font-size:14px;cursor:pointer;color:var(--mute)}
+.seg button[aria-pressed=true]{background:var(--ink);color:#fff}
+select{font:inherit;font-size:14px;padding:7px 9px;border:1px solid var(--rule);background:#fff;color:inherit}
+.ctrl span{font-size:13px;color:var(--mute)}
+h2{font-size:19px;font-weight:600;margin:44px 0 4px;padding-bottom:8px;border-bottom:2px solid var(--ink)}
+.note{color:var(--mute);font-size:14px;margin:8px 0 18px;max-width:68ch}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:right;padding:10px;border-bottom:1px solid var(--rule);font-weight:400}
+th{text-align:left;font-weight:600}
+thead th,thead td{font-size:13px;color:var(--mute);border-bottom:1px solid var(--ink);font-weight:600}
+td.bar,th.bar{width:40%}
+.bar i{display:inline-block;height:17px;vertical-align:middle}
+.key{display:flex;flex-wrap:wrap;gap:18px;margin-top:14px;font-size:13px;color:var(--mute)}
+.key i{display:inline-block;width:11px;height:11px;margin-right:6px}
+.strip{margin:20px 0}
+.strip h3{font-size:14px;font-weight:600;margin:0 0 6px}
+.spark{display:flex;align-items:flex-end;gap:2px;height:48px;background:var(--panel);padding:3px}
+.spark i{flex:1;background:var(--run);min-width:2px}
+.flag{background:var(--panel);border-left:3px solid var(--unp);padding:16px 18px;margin:18px 0}
+.flag p{margin:0 0 10px;font-size:14px;max-width:68ch}
+.empty{color:var(--mute);padding:28px 0}
+footer{margin-top:72px;padding-top:16px;border-top:1px solid var(--rule);font-size:13px;color:var(--mute)}
+@media(max-width:700px){td.bar,th.bar{display:none}}
+.lnk{background:none;border:0;padding:0;font:inherit;font-weight:600;color:inherit;
+text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+
+/* ---- additions to the reference report ---- */
+nav a{display:block;padding:9px 12px;font-weight:600;color:var(--mute);text-decoration:none;
+border-bottom:2px solid transparent;margin-bottom:-1px}
+nav a[aria-current=page]{color:var(--ink);border-bottom-color:var(--ink)}
+.seg button{font-weight:400}
+.ctrl label{font-size:13px;color:var(--mute);display:inline-flex;gap:5px;align-items:center}
+.ctrl .widen{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.flag.info{border-left-color:var(--ink)}
+.flag ul{margin:0 0 10px;padding-left:18px;font-size:14px;max-width:68ch}
+tfoot th,tfoot td{font-weight:600;border-bottom:0;border-top:1px solid var(--ink)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+footer p{margin:0 0 8px;max-width:90ch}
+thead small.f{display:block;font-weight:400;font-size:12px;color:var(--mute)}
+.bad{color:var(--unp);font-weight:600}
+.bad small{display:block;font-weight:400;font-size:12px}
+.muted{color:var(--mute);font-weight:400}
+.multi .sep{color:var(--mute)}
+.multi small{display:block;font-size:11px;color:var(--pln);text-transform:uppercase;letter-spacing:.04em}
+tr.changeover th,tr.changeover td{background:#FBF7EE}
+table.hours td,table.hours th{padding:7px 10px;font-size:14px}
+table.hours td:nth-child(4),table.hours td:nth-child(5),table.hours td:nth-child(3){text-align:left}

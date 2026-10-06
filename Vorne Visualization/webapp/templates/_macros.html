@@ -1,0 +1,54 @@
+{% macro stack(t) -%}
+{%- set all = t.elapsed or 1 -%}
+{%- for k, v, name in [('run', t.run, 'Running'), ('unp', t.unp, 'Unplanned stop'), ('pln', t.pln, 'Planned stop'), ('nsc', t.nsc, 'Not scheduled')] -%}
+{%- if v > 0 %}<i style="width:{{ '%.3f'|format(v / all * 100) }}%;background:var(--{{ k }})" title="{{ name }}: {{ v|hrs }} h"></i>{% endif -%}
+{%- endfor -%}
+{%- endmacro %}
+
+{# Rate column headers carry their formula, so the definition survives a glance. #}
+{% macro rate_heads() -%}
+<td title="running ÷ scheduled, full one-hour records only">Available<small class=f>run ÷ scheduled</small></td>
+<td title="ideal ÷ running, full one-hour records only">Performance<small class=f>ideal ÷ run</small></td>
+<td title="scheduled ÷ elapsed, all closed records. Not the old report's 'Utilised' - see the footer.">Calendar use<small class=f>scheduled ÷ elapsed</small></td>
+{%- endmacro %}
+
+{# Performance above 100% means the part's ideal cycle time is wrong, not a fast machine. #}
+{% macro perf(v) -%}
+{%- if v is none -%}—
+{%- elif v > 1 -%}<span class=bad title="Above 100%: the ideal cycle time configured for this part is longer than the machine actually cycles. A configuration error, not a fast machine.">{{ v|pc }} <small>wrong ideal cycle time</small></span>
+{%- else -%}{{ v|pc }}{%- endif -%}
+{%- endmacro %}
+
+{% macro key() -%}
+<div class=key><span><i style="background:var(--run)"></i>Running</span>
+<span><i style="background:var(--unp)"></i>Unplanned stop</span>
+<span><i style="background:var(--pln)"></i>Planned stop</span>
+<span><i style="background:var(--nsc)"></i>Not scheduled</span></div>
+{%- endmacro %}
+
+{% macro spark(dev, days) -%}
+<div class=strip><h3>{{ dev }}</h3>
+<div class=spark role=img aria-label="{{ dev }} daily availability, {{ days|length }} production days">
+{%- for day, a in days -%}
+<i title="{{ day|pday }} · {{ a|pc if a is not none else 'nothing scheduled' }}" style="height:{{ '%.1f'|format([(a or 0) * 100, 1.5]|max) }}%"></i>
+{%- endfor -%}
+</div></div>
+{%- endmacro %}
+
+{% macro counts_flag() -%}
+<h2>Piece counts are not yet reliable</h2>
+<div class=flag><p>Reject count is derived as infeed minus good count rather than from scanned reject
+reasons, and the reject-event log is empty across the entire history. Where the good-count sensor
+registers more pieces than the infeed sensor saw, rejects go negative.</p>
+<p>The net is unchanged at hour, shift and day level, so this is a measurement fault rather than a
+timing artefact. Quality and OEE are withheld until the count inputs are reviewed.</p></div>
+{%- endmacro %}
+
+{% macro methodology(snap, devices) -%}
+<p>Four Vorne XL devices on software 2.22.14.2, read through the channel API into a local cache.
+Data runs to the last closed hour{% for d in devices %}{% if snap.history[d].last_closed_end %}{{ ' (' if loop.first else ', ' }}{{ d }} {{ snap.history[d].last_closed_end|local }}{{ ')' if loop.last }}{% endif %}{% endfor %};
+the hour still in progress is not included. Cache refreshed {{ snap.last_refresh|local }}.</p>
+<p>Available = running ÷ scheduled. Performance = ideal ÷ running. Both use full one-hour records only,
+where partial records distort the rate. Calendar use = scheduled ÷ elapsed, and every hours column, use
+<em>all</em> closed records, including the long overnight not-scheduled blocks. Down h = unplanned stop.</p>
+{%- endmacro %}
