@@ -29,9 +29,9 @@
       <dt>Shift</dt><dd>{{ r.shift_label or (r.shift or '—')|replace('_', ' ') }}
         {%- if r.shift_elapsed_s is not none %}, <strong>{{ hm(r.shift_elapsed_s) }}</strong> in{% endif %}
         {%- if r.shift_start_ts %} <span class=muted>(since {{ since(r.shift_start_ts) }})</span>{% endif %}</dd>
-      <dt>This shift</dt><dd>Run <strong>{{ h1(r.shift_run_time) }} h</strong> · Down <strong>{{ h1(r.shift_unplanned_stop_time) }} h</strong>
-        · Planned <strong>{{ h1(r.shift_planned_stop_time) }} h</strong></dd>
-      <dt>Available</dt><dd><strong>{{ r.availability|pc }}</strong> <span class=muted>· Performance</span>
+      <dt>This shift</dt><dd>{{ term('run_h', 'Run') }} <strong>{{ h1(r.shift_run_time) }} h</strong> · {{ term('down', 'Down') }} <strong>{{ h1(r.shift_unplanned_stop_time) }} h</strong>
+        · {{ term('planned', 'Planned') }} <strong>{{ h1(r.shift_planned_stop_time) }} h</strong></dd>
+      <dt>{{ term('available') }}</dt><dd><strong>{{ r.availability|pc }}</strong> <span class=muted>· {{ term('performance') }}</span>
         <strong>{{ r.performance|pc }}</strong></dd>
     </dl>
   </div>

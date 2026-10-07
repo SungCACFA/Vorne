@@ -1,0 +1,21 @@
+{#- The definitions of every measure this page named, from webapp/glossary.py. The term links point
+    here, so without scripts a definition is one jump away; with scripts this is where the panel
+    takes its text from. -#}
+{%- set used = terms_used() -%}
+{%- if used %}
+<section class=glossary aria-labelledby=defs-h>
+<h3 id=defs-h>Definitions</h3>
+<dl>
+{%- for k, t in used %}
+<div class=def id="def-{{ k }}" data-def-body="{{ k }}">
+<dt>{{ t.label }}</dt>
+<dd><p class=means>{{ t.means }}</p>
+<p><span class=k>Formula</span> {{ t.formula }}</p>
+<p><span class=k>What it answers</span> {{ t.answers }}</p>
+<p><span class=k>Caution</span> {{ t.caution }}</p></dd>
+</div>
+{%- endfor %}
+</dl>
+<p class=defsrc>Wording: {{ glossary_source }}.</p>
+</section>
+{%- endif %}

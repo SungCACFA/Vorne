@@ -7,9 +7,9 @@
 
 {# Rate column headers carry their formula, so the definition survives a glance. #}
 {% macro rate_heads() -%}
-<td title="running ÷ scheduled, full one-hour records only">Available<small class=f>run ÷ scheduled</small></td>
-<td title="ideal ÷ running, full one-hour records only">Performance<small class=f>ideal ÷ run</small></td>
-<td title="scheduled ÷ elapsed, all closed records. Not the old report's 'Utilised' - see the footer.">Calendar use<small class=f>scheduled ÷ elapsed</small></td>
+<td>{{ term('available') }}<small class=f>run ÷ scheduled</small></td>
+<td>{{ term('performance') }}<small class=f>ideal ÷ run</small></td>
+<td>{{ term('calendar_use') }}<small class=f>scheduled ÷ elapsed</small></td>
 {%- endmacro %}
 
 {# Performance above 100% means the part's ideal cycle time is wrong, not a fast
@@ -33,7 +33,7 @@
 <div class=strip><h3>{{ dev }}</h3>
 <div class=spark role=img aria-label="{{ dev }} daily availability, {{ days|length }} production days">
 {%- for day, a in days -%}
-<i title="{{ day|pday }} · {{ a|pc if a is not none else 'nothing scheduled' }}" style="height:{{ '%.1f'|format([(a or 0) * 100, 1.5]|max) }}%"></i>
+<i title="Production day {{ day|pday }}&#10;{{ ('Available ' ~ a|pc) if a is not none else 'Nothing scheduled' }}" style="height:{{ '%.1f'|format([(a or 0) * 100, 1.5]|max) }}%"></i>
 {%- endfor -%}
 </div></div>
 {%- endmacro %}

@@ -111,7 +111,7 @@ def test_thresholds_come_from_config(replayed_cache, tmp_path):
     html = create_app(cfg).test_client().get("/line/AreaB?g=ytd&p=2026").get_data(as_text=True)
     assert "254 stops: 2 per production day with records" in html
     assert ">120 min per stop<" in html
-    assert re.search(r"<title>Bulk Replenishment · [\d.]+ h lost · 10 stops · 94 min each · Minor</title>", html)
+    assert re.search(r"<title>Bulk Replenishment · [\d.]+ h lost · 10 stops · 94 min each · Minor\n", html)
 
 
 def test_default_thresholds_are_one_per_day_and_30_minutes():
@@ -121,10 +121,10 @@ def test_default_thresholds_are_one_per_day_and_30_minutes():
 def test_quadrant_on_the_recording(app_client):
     html = app_client.get("/line/AreaB?g=ytd&p=2026").get_data(as_text=True)
     quad = html[html.index('<svg class=quad'):html.index('</svg>', html.index('<svg class=quad'))]
-    assert re.search(r"<title>Bottle Jam · [\d.]+ h lost · 260 stops · 12 min each · Chronic nuisance</title>", quad)
+    assert re.search(r"<title>Bottle Jam · [\d.]+ h lost · 260 stops · 12 min each · Chronic nuisance\n", quad)
     # Pick & Place 2 is 55 stops of 8 min once its one 56 h "down" (flagged implausible) is left out.
-    assert re.search(r"<title>Pick &amp; Place 2 · 7.3 h lost · 55 stops · 8 min each · Minor</title>", quad)
-    assert re.search(r"<title>Bulk Replenishment · [\d.]+ h lost · 10 stops · 94 min each · Major breakdown</title>", quad)
+    assert re.search(r"<title>Pick &amp; Place 2 · 7.3 h lost · 55 stops · 8 min each · Minor\n", quad)
+    assert re.search(r"<title>Bulk Replenishment · [\d.]+ h lost · 10 stops · 94 min each · Major breakdown\n", quad)
     assert "127 stops: 1 per production day with records" in quad
     for name in ("Critical", "Chronic nuisance", "Major breakdown", "Minor"):
         assert f">{name}</text>" in quad

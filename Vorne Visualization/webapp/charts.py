@@ -90,12 +90,21 @@ def heatmap(slots: dict[int, list[dict]], days: list[int], href_for_day) -> Mark
                                f'class=other><title>{d:%a} {d.day} {d:%b} {c["start"]:%H:%M} · mostly another '
                                f'product</title></rect>')
                     continue
-                parts = [f"{LABEL[k]} {_m(v)} min" for k, v in c["seconds"].items() if v >= 30]
+                # the hour; what ran; all four buckets, zeros included; the dominant state and its reason
+                split = " · ".join(f"{LABEL[k]} {_m(c['seconds'].get(k, 0.0))} min" for k in D.IMPACTS)
                 what = (c["top_state"] or "").replace("_", " ")
                 if c["top_reason"] and c["top_reason"] != c["top_state"]:
-                    what += f" ({c['top_reason']})"
-                title = f"{d:%a} {d.day} {d:%b} {c['start']:%H:%M} · {LABEL[c['dominant']]} · " + ", ".join(parts) \
-                        + (f" · mostly {what}" if what else "")
+                    what += f": {c['top_reason']}"
+                end = c.get("end")
+                st = c["start"]           # the hour's own date: 23:00 belongs to the evening before
+                title = "\n".join([
+                    f"{st:%a} {st.day} {st:%b} {st:%H:%M}" + (f"–{end:%H:%M}" if end else "")
+                    + (f" (production day {d:%a} {d.day} {d:%b})" if st.date() != d else ""),
+                    "Ran " + (" / ".join(c.get("parts") or []) or "no part recorded"),
+                    split,
+                    f"Mostly {LABEL[c['dominant']].lower()}"
+                    + (f" — {what}" if what and what.lower() != LABEL[c["dominant"]].lower() else ""),
+                ])
             out.append(f'<rect x="{x}" y="{y}" width="{cell_w - gap}" height="{row_h - gap}" rx="1" fill="{fill}">'
                        f'<title>{escape(title)}</title></rect>')
         out.append("</a>")
@@ -200,9 +209,9 @@ def quadrant(reasons: list[dict], n_days: int, label_top: int = 7, *,
     labelled = {id(r) for r in ranked[:label_top]}
     for r in ranked:
         cx, cy, rr = X(r["events"]), Y(r["mean_s"] / 60), rad(r["seconds"])
-        name, _ = zone_of(r["events"], r["mean_s"], split_e, split_m)
+        name, action = zone_of(r["events"], r["mean_s"], split_e, split_m)
         title = (f"{r['reason']} · {_h(r['seconds'])} h lost · {r['events']:,} stops · "
-                 f"{_m(r['mean_s'])} min each · {name}")
+                 f"{_m(r['mean_s'])} min each · {name}\n{action[0].upper() + action[1:]}")
         o.append(f'<g class=bubble><circle cx="{cx:.1f}" cy="{cy:.1f}" r="{rr:.1f}" class=dot />'
                  f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{max(rr, 12):.1f}" class=hit>'
                  f'<title>{escape(title)}</title></circle></g>')
@@ -309,7 +318,8 @@ def pareto(reasons: list[dict], top: int = 15) -> Markup:
                  f'rx="2" class="{"bar other" if other else "bar"}" />'
                  f'<rect x="0" y="{y}" width="{W}" height="{row_h}" class=hitrow>'
                  f'<title>{escape(name)} · {_h(s)} h ({s / total:.0%} of lost hours) · {n:,} stops · '
-                 f'running total {c:.0%}</title></rect></g>')
+                 f'{_m(s / n) if n else "—"} min each\nrunning total {c:.0%} · 80% of lost hours takes '
+                 f'{need} of {len(rs)} reasons</title></rect></g>')
         pts.append((X(c), y + row_h / 2))
     o.append('<polyline class=cum points="' + " ".join(f"{x:.1f},{y:.1f}" for x, y in pts) + '" />')
     for i, (x, y) in enumerate(pts):
@@ -338,6 +348,22 @@ def pareto(reasons: list[dict], top: int = 15) -> Markup:
 
 
 # ---------------------------------------------------------------- rhythm
+
+def _week_tip(ws: list[dict], i: int) -> str:
+    """One week of the rhythm chart: both means, each with its change from the week before."""
+    w = ws[i]
+    d = date.fromisoformat(w["week"])
+    lines = [f"Week of {D.nice(d)}"]
+    for key, label, n in (("run_min", "Mean run burst", f"{w['run_bursts']:,} run bursts"),
+                          ("stop_min", "Mean unplanned stop", f"{w['stops']:,} stops")):
+        if w[key] is None:
+            lines.append(f"{label}: none")
+            continue
+        prev = ws[i - 1][key] if i > 0 else None
+        delta = f" ({w[key] - prev:+.0f} min on the week before)" if prev is not None else " (first week shown)"
+        lines.append(f"{label} {w[key]:.0f} min{delta} · {n}")
+    return "\n".join(lines)
+
 
 def rhythm(weeks: list[dict], change: dict | None = None) -> Markup:
     """Mean run-burst minutes and mean unplanned-stop minutes by week, on one
@@ -394,11 +420,10 @@ def rhythm(weeks: list[dict], change: dict | None = None) -> Markup:
         series = [(i, w) for i, w in enumerate(ws) if w[key] is not None]
         pts = [(X(i), Y(w[key])) for i, w in series]
         o.append(f'<polyline class="line {cls}" points="' + " ".join(f"{x:.1f},{y:.1f}" for x, y in pts) + '" />')
-        for (x, y), (_, w) in zip(pts, series):
-            what = (f"{w['run_bursts']:,} run bursts" if key == "run_min" else f"{w['stops']:,} stops")
+        for (x, y), (i, w) in zip(pts, series):
             o.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4" class="pt {cls}" />'
-                     f'<circle cx="{x:.1f}" cy="{y:.1f}" r="12" class=hit><title>Week of {w["week"]} · '
-                     f'{label.lower()} {w[key]:.0f} min · {what}</title></circle>')
+                     f'<circle cx="{x:.1f}" cy="{y:.1f}" r="12" class=hit><title>{escape(_week_tip(ws, i))}'
+                     f'</title></circle>')
         if pts and not clash:      # colliding end labels are dropped, never stacked
             (lx, ly), last = pts[-1], series[-1][1][key]
             o.append(f'<text x="{lx + 10:.1f}" y="{ly + 4:.1f}" class=lab>{label} '

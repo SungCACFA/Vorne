@@ -49,7 +49,7 @@ when there are, they go in `.env`, which is git-ignored.
 | `python -m webapp [--port N]` | The app. Reads the cache on every request, so a refresh shows on the next page load. Also runs the live writer for `/live` (`--no-live-writer` to leave it to a separate process). |
 | `python -m xlpipe live [--interval S]` | The live writer on its own: every device's real-time data into `current_state`, every 5 s. One writer at a time. |
 | `python -m webapp export [--out FILE] [--keep]` | A self-contained, read-only HTML snapshot of every page, product page and period (≈3 min, ≈2.6 MB). Deletes earlier exports in the same folder unless `--keep`. See below. |
-| `python -m pytest` | 344 tests, no device needed (≈4–7 min, most of it the export tests). |
+| `python -m pytest` | 359 tests, no device needed (≈4–7 min, most of it the export tests). |
 | `python tests/mutation_check.py` | Would the tests notice if the code were wrong? See Tests. |
 | `python preflight.py` | When there is a database path: DNS, TCP 5432, TLS, auth, permissions, latency, as separate steps. |
 
@@ -227,6 +227,29 @@ time run by run, with reconfigurations marked; changeover cost in and out of it.
 parts) and the state events the device attributes to it, open run included. The heatmap shows other products' time
 in white. Calendar use under the filter is scheduled ÷ elapsed while that part was on the line. Live app only.
 
+## Tooltips and definitions
+
+**Every chart mark has a tooltip** that follows the cursor, flips at the window's edges, and opens on a tap on
+touch screens (tap again or elsewhere to close). The text is each mark's SVG `<title>`, so without scripts the
+browser's own tooltip still shows it; `_interact.html` moves it into its own tooltip on first hover.
+
+- Heatmap cell: the hour on its own date (a production day's first hour is 23:00 the evening before), what ran, all
+  four buckets including zeros, and the dominant state and reason.
+- Quadrant bubble: reason, hours lost, stops, minutes each, zone, and what the zone implies.
+- Pareto bar: reason, hours and share, stops, minutes each, running total, and how many reasons reach 80%.
+- Rhythm point: the week, both means, and each one's change from the week before.
+- Changeover cell and sparkline bar: from and to with count and mean; the production day and its availability.
+
+**Every measure name is a definition** wherever it is a column header or label: a dotted underline, reachable by
+Tab, opened by Enter or a click, closed by Escape (focus returns to it), a click elsewhere, or ×. The panel gives a
+one-line definition, the formula, what it answers and one caution. The wording lives only in `webapp/glossary.py`;
+templates write `term('available')`. Each page's footer lists the definitions it used, so without scripts a measure
+name is a link to its definition, and with scripts the panel takes its text from that list.
+
+**The wording is provisional.** It was to come from the measures guide (PDF), which was not on this machine; until
+it is supplied, `glossary.py` uses the wording already on the site, and each page says so under its definitions.
+Replacing it changes that one file.
+
 ## The sticky band
 
 On every page the nav stays at the top while scrolling, with the page's bar directly under it: the granularity and
@@ -305,7 +328,7 @@ no server and fetches nothing: open it in Edge, Chrome or Firefox, or attach it 
 
 ## Tests
 
-`python -m pytest` — 344 tests, four to seven minutes (most of it the export tests), no device. Fixtures in `tests/fixtures/devices/` (16 MB) are a
+`python -m pytest` — 359 tests, four to seven minutes (most of it the export tests), no device. Fixtures in `tests/fixtures/devices/` (16 MB) are a
 recorded first-run backfill of all four devices; the end-to-end tests replay them through the real sync into a fresh
 cache.
 
@@ -331,13 +354,14 @@ in that code would be compared with itself and pass.
 | `test_charts.py` | Heatmap painting (latest-started event owns the time), 24 h coverage, the AreaB idle stretch, quadrant zones and config thresholds, labels that never overlap. |
 | `test_charts_more.py` | The implausible rule (42 events, the 24 h cap, config), charts leaving them out and tables keeping them, Pareto on one axis, rhythm weeks, changeovers charged once. |
 | `test_rhythm_pareto.py` | The rhythm change point (AreaB 11 May, −60%, t 6.5; not the other lines), the Pareto verdict, the availability-convention note. |
+| `test_explain.py` | Every measure asked for defined in full; the page showing the module's wording; an unknown term failing loudly; each page marking its measures and listing exactly those definitions; each chart's tooltip text with literals; and in headless Edge: hover, the native title removed, the edge flip, tap and second tap, open on Enter with focus moving in, Escape returning focus, click outside closing. |
 | `test_sticky.py` | The bar directly under the nav on every page (the live status line on /live), the rules, and in headless Edge at 1280 and 390 px: band under 90 px, nav at 0 with the bar exactly under it, only the nav on a phone, the shadow only once floating, the hour-table jump landing below the band. The export's band is checked in `test_export.py`. |
 | `test_live.py` | Each device's recorded reading, no counts, a failed read keeping the last values, a slow device not delaying the rest, one writer, the page reading only the table, never-run, stale by age and by failure, never-read panels, the JSON endpoint, counted vs wall-clock time; and in headless Edge: a reading turning stale as it ages, a failed poll keeping values with ages climbing, an in-place update with no reload, polling paused while hidden and resumed at once. |
 | `test_product_pages.py` | Runs and their stops against part_run, ICT levels and outliers, the reconfigurations on the recording, every product-page section with literal figures, part links, the line page's product filter. |
 
 ### Mutation check
 
-`python tests/mutation_check.py` applies, one at a time, 91 deliberate bugs of the kind a refactor or a "helpful" fix
+`python tests/mutation_check.py` applies, one at a time, 102 deliberate bugs of the kind a refactor or a "helpful" fix
 could introduce — clamping a count, inverting a ratio, taking a mean for a median, starting weeks on Sunday — runs
 the suite against each, and restores the original. A bug the suite does not notice is a gap. It takes several minutes;
 `--list` shows the bugs, and numbers run a subset.

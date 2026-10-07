@@ -194,7 +194,8 @@ def test_the_24h_cap_flags_even_when_the_median_is_long(tmp_path):
 def test_rhythm_on_the_page_leaves_implausible_stops_out(app_client):
     """The data function excluding them is not enough: the page must pass them."""
     h = app_client.get("/line/AreaB?g=ytd&p=2026").get_data(as_text=True)
-    assert "<title>Week of 2026-05-11 · mean unplanned stop 4 min · 2 stops</title>" in h
+    assert re.search(r"<title>Week of 11 May 2026\nMean run burst \d+ min \([^)]*\) · [\d,]+ run bursts\n"
+                     r"Mean unplanned stop 4 min \([+-]\d+ min on the week before\) · 2 stops</title>", h)
 
 
 def test_july_panel_adjusts_availability_too(app_client):

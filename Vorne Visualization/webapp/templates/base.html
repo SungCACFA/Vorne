@@ -34,7 +34,8 @@ document.addEventListener('click', ev => {
              document.getElementById('hours').scrollIntoView({behavior: 'smooth'}); }
 }, true);
 </script>
-<footer><!--foot-->{% block footer %}{% endblock %}<!--/foot--></footer>
+<footer><!--foot-->{% block footer %}{% endblock %}{% include "_glossary.html" %}<!--/foot--></footer>
 </div>
 {% include "_sticky.html" %}
+{% include "_interact.html" %}
 </html>

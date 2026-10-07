@@ -10,11 +10,11 @@
 {%- set mine = opens|selectattr('channel', 'equalto', channel)|list -%}
 <h2>{{ title }}</h2><p class=note>{{ lead }}</p>
 <div class=scroll><table class=prod><thead><tr><th>Part</th><td class=left>Job</td><td class=left>Line</td>
-<td class=left>Started</td><td title="days, with hours beneath for subtracting">Elapsed<small class=f>d / h</small></td><td>Run h</td><td>Earned h</td><td>Stopped h</td><td>Run cycles</td>
-<td>Actual s/cycle</td><td>vs derived</td></tr></thead>
+<td class=left>Started</td><td>{{ term('elapsed') }}<small class=f>d / h</small></td><td>{{ term('run_h') }}</td><td>{{ term('earned_h') }}</td><td>{{ term('stopped_h') }}</td><td>Run cycles</td>
+<td>{{ term('actual_spc') }}</td><td>vs derived</td></tr></thead>
 <tbody>
 {% for o in mine %}
-<tr class=open><th>{{ o.part|partlink }} <span class="badge{{ '' if o.reasons else ' mild' }}">open{{ ' · ' ~ '%.0f'|format(o.open_days) ~ ' d' if o.reasons }}</span></th>
+<tr class=open><th>{{ o.part|partlink }} <span class="badge{{ '' if o.reasons else ' mild' }}">{{ term('open_run', 'open') }}{{ ' · ' ~ '%.0f'|format(o.open_days) ~ ' d' if o.reasons }}</span></th>
 <td class=left>{{ o.job or '—' }}</td><td class=left>{{ o.device_id }}</td><td class="left nw">{{ o.start|local }}</td>
 <td>{{ o.open_seconds|elapsed }}</td><td>{{ o.run_seconds|h1 }}</td>
 <td colspan=5 class=left><span class=state>still accumulating; not in the totals above{{ ' — ' ~ o.reasons|join('; ') if o.reasons }}</span></td></tr>
@@ -43,7 +43,7 @@
 <p class=note>One row per part per line, for runs that started in this period. The derived ideal cycle time is the
 median of ideal time ÷ run cycles over that line's runs of more than 200 cycles, all usable history; it is per
 machine <em>cycle</em>. Pieces per cycle and the SAP standard are yours to enter. With pieces per cycle filled in, the
-SAP per-piece standard converts to per cycle and can be compared. <strong>Run h</strong> is cycling time only: time the line was cycling, including slow cycles and small stops (any cycle shorter than the down threshold), but no down time and no planned stops.</p>
+SAP per-piece standard converts to per cycle and can be compared. <strong>{{ term('run_h') }}</strong> is cycling time only: time the line was cycling, including slow cycles and {{ term('small_stops', 'small stops') }} (any cycle shorter than the down threshold), but no down time and no planned stops.</p>
 
 {% if export %}<p class=note><strong>Read-only snapshot.</strong> SAP standards and pieces per cycle are shown as
 they were when this file was exported; edit them in the live app. SAP values are shown in seconds per piece.</p>
@@ -71,13 +71,13 @@ they were when this file was exported; edit them in the live app. SAP values are
 {% set any_sap = rows|selectattr('sap_spc')|list %}
 <div class=scroll><table class=prod><thead><tr>
 <th>Part</th><td class=left>Line</td><td>Runs</td>
-<td title="median ideal_time ÷ run_cycles, runs over 200 cycles">Derived ICT<small class=f>s per cycle</small></td>
+<td>{{ term('derived_ict') }}<small class=f>s per cycle</small></td>
 <td title="hand-entered; NULL means not configured">Pieces per cycle</td>
 <td title="hand-entered, in the unit selected above">SAP standard<small class=f>{{ dict(units)[unit]|lower }}</small></td>
-<td>Actual<small class=f>s per cycle</small></td><td>vs derived</td><td>vs SAP</td>
-<td title="cycling time only, including slow cycles and small stops">Run h</td><td title="ideal time: cycles × the device's configured ideal cycle time">Earned h</td>
+<td>{{ term('actual_spc', 'Actual') }}<small class=f>s per cycle</small></td><td>vs derived</td><td>vs SAP</td>
+<td>{{ term('run_h') }}</td><td>{{ term('earned_h') }}</td>
 {% if any_sap %}<td>Earned h, SAP</td>{% endif %}
-<td title="actual − earned">Variance h</td><td>Actual<small class=f>s per piece</small></td>
+<td>{{ term('variance_h') }}</td><td>Actual<small class=f>s per piece</small></td>
 </tr></thead>
 <tbody>
 {% for r in rows %}

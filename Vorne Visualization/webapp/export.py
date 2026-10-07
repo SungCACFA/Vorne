@@ -198,7 +198,8 @@ def build(config_path: str | Path | None = None, out: str | Path | None = None, 
     packed = base64.b64encode(gzip.compress(raw, compresslevel=9)).decode("ascii")
     css = (ROOT / "webapp" / "static" / "style.css").read_text(encoding="utf-8")
     sticky = (ROOT / "webapp" / "templates" / "_sticky.html").read_text(encoding="utf-8")
-    html = (SHELL.replace("/*CSS*/", css).replace("/*STICKY*/", sticky)
+    interact = (ROOT / "webapp" / "templates" / "_interact.html").read_text(encoding="utf-8")
+    html = (SHELL.replace("/*CSS*/", css).replace("/*STICKY*/", sticky).replace("/*INTERACT*/", interact)
                  .replace("__BUNDLE__", packed)
                  .replace("__EXPORTED__", bundle["stamp"]["exported"]))
 
@@ -241,6 +242,7 @@ nav button[aria-current=page]{color:var(--ink);border-bottom-color:var(--ink)}
 <footer id=foot></footer>
 </div>
 /*STICKY*/
+/*INTERACT*/
 <script>
 const PACKED = "__BUNDLE__";
 let B = null, page = 'overview', gran = 'month', period = null;

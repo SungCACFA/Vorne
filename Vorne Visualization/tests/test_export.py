@@ -75,7 +75,7 @@ def test_read_only(export):
 def test_every_quality_panel_survives(export):
     _, b = export
     (_, head, panel, body, _), _ = fragment(b, "overview", "month", "2026-09")
-    assert "run open for" in head                       # open-run alert
+    assert "run open for" in re.sub(r"<[^>]+>", "", head)   # open-run alert ("run open" is a definition link)
     assert "Production days from" in panel and "live app" in panel   # exclusion, snapshot wording
     assert "Piece counts are not yet reliable" in body
     (_, _, _, line, _), _ = fragment(b, "FR8", "day", "2026-07-03")
@@ -173,3 +173,11 @@ def test_the_export_has_the_same_sticky_band(export, tmp_path):
     assert html.count("// The sticky band") == 1
     m = measure(html.replace("location.hash.slice(1)", "'AreaB/month/2026-09'"), 1280, tmp_path)
     assert m["navTop"] == 0 and abs(m["barTop"] - m["navH"]) < 1 and m["band"] < 90 and m["scrolled"] is True
+
+
+def test_the_export_carries_tooltips_and_definitions(export):
+    html, b = export
+    assert html.count("// Chart tooltips and measure definitions.") == 1
+    (_, _, _, body, foot), _ = fragment(b, "AreaB", "month", "2026-09")
+    assert '<a class=term href="#def-available" data-def="available">' in body
+    assert '<div class=def id="def-available" data-def-body="available">' in foot     # the panel's text travels with the page

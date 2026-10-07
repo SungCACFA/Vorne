@@ -1,7 +1,7 @@
 {% if open_alerts %}
 <div class="flag alert" role=alert>
   {% for r in open_alerts %}
-  <p><strong>{{ r.device_id }}: {{ r.channel }} run open for {{ '%.0f'|format(r.open_days) }} days.</strong>
+  <p><strong>{{ r.device_id }}: {{ r.channel }} {{ term('open_run', 'run open') }} for {{ '%.0f'|format(r.open_days) }} days.</strong>
   {% if r.channel == 'job' %}Job {{ r.job }}{% else %}Part {{ r.part|partlink }}{% if r.job %}, job {{ r.job }}{% endif %}{% endif %}
   has been open since {{ r.start|local }},
   with {{ r.run_seconds|hrs }} run-hours so far: {{ r.reasons|join('; ') }}.</p>

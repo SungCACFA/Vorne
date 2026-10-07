@@ -494,7 +494,7 @@ def hour_slots(cache_path, dev: str, days: list[int], part: str | None = None) -
             # With a product chosen, other products' events still own their time (so the chosen
             # part's events keep exactly their own durations), painted as "another product".
             kind = "other" if part and ev_part != part else imp if imp in IMPACTS else "not_scheduled"
-            evs.append((s, e, kind, state, reason))
+            evs.append((s, e, kind, state, reason, ev_part))
 
     out: dict[int, list[dict]] = {}
     for n in days:
@@ -506,8 +506,13 @@ def hour_slots(cache_path, dev: str, days: list[int], part: str | None = None) -
             covered = sum(secs.values())
             dominant = max(secs, key=lambda k: secs[k]) if covered > 0 else None
             top = max(what.items(), key=lambda kv: kv[1])[0] if what else None
-            cells.append({"start": bounds[h], "seconds": secs, "covered": covered, "dominant": dominant,
-                          "top_state": top[1] if top else None, "top_reason": top[2] if top else None})
+            parts: dict[str, float] = {}           # what ran in the hour, most time first
+            for key, sec in what.items():
+                if len(key) > 3 and key[3]:
+                    parts[key[3]] = parts.get(key[3], 0.0) + sec
+            cells.append({"start": bounds[h], "end": bounds[h + 1], "seconds": secs, "covered": covered, "dominant": dominant,
+                          "top_state": top[1] if top else None, "top_reason": top[2] if top else None,
+                          "parts": sorted(parts, key=lambda k: -parts[k])})
         out[n] = cells
     return out
 
@@ -531,7 +536,8 @@ def paint(events: list[tuple], a: datetime, b: datetime) -> tuple[dict[str, floa
         ev = max(live, key=lambda ev: ev[0])
         d = (y - x).total_seconds()
         secs[ev[2]] = secs.get(ev[2], 0.0) + d
-        what[(ev[2], ev[3], ev[4])] = what.get((ev[2], ev[3], ev[4]), 0.0) + d
+        key = tuple(ev[2:])               # (impact, state, reason[, part])
+        what[key] = what.get(key, 0.0) + d
     return secs, what
 
 

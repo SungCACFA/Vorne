@@ -51,7 +51,7 @@ Calendar use here is scheduled ÷ elapsed while {{ part }} was on the line.
 {% else %}
 {% set down_events = unplanned|sum(attribute='events') %}
 <h2>{{ dev }} at a glance</h2>
-<table><thead><tr><td class=bar>Share of elapsed time</td>{{ rate_heads() }}<td>Scheduled h</td><td>Down h</td><td>Down events</td></tr></thead>
+<table><thead><tr><td class=bar>Share of elapsed time</td>{{ rate_heads() }}<td>{{ term('scheduled', 'Scheduled h') }}</td><td>{{ term('down', 'Down h') }}</td><td>Down events</td></tr></thead>
 <tbody><tr><td class=bar>{{ stack(t) }}</td><td>{{ t.availability|pc }}</td><td>{{ perf(t.performance) }}</td>
 <td>{{ t.utilization|pc }}</td><td>{{ t.sched|hrs }}</td><td>{{ t.unp|hrs }}</td><td>{{ '{:,}'.format(down_events) }}</td></tr></tbody>
 </table>
@@ -175,8 +175,8 @@ Over 100% means the ideal cycle time configured for that part is wrong, not that
 as such{% endif %}.{% endif %}</p>
 <p class=filterbar hidden>Showing <strong data-filter-label></strong> only.
 <button type=button data-filter-clear>Show all days</button></p>
-<div class=scroll><table class=hours><thead><tr><th>Production day</th><td>Hour</td><td>Shift</td><td>Part</td><td>Job</td>
-<td>Run min</td><td>Down min</td><td>Planned min</td><td>Perf</td></tr></thead>
+<div class=scroll><table class=hours><thead><tr><th>{{ term('production_day') }}</th><td>Hour</td><td>Shift</td><td>Part</td><td>Job</td>
+<td>{{ term('run_h', 'Run min') }}</td><td>{{ term('down', 'Down min') }}</td><td>{{ term('planned', 'Planned min') }}</td><td>{{ term('performance', 'Perf') }}</td></tr></thead>
 <tbody>
 {% for h in hours %}
 {%- set cls = (['changeover'] if h.part and ',' in h.part else []) + (['beyond'] if loop.index > 500 else []) %}

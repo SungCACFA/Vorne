@@ -213,6 +213,25 @@ def create_app(config_path: str | Path = ROOT / "config.yaml") -> Flask:
         return Markup('<span class=multi title="Several values in one record: changeover">'
                       + '<span class=sep> / </span>'.join(names) + '<small>changeover</small></span>')
 
+    # ------------------------------------------------------- definitions
+    from flask import g
+
+    from . import glossary as GL
+
+    def term(key: str, label: str | None = None) -> Markup:
+        """A measure's name, linked to its one definition (webapp/glossary.py). Records the term so
+        the page's footer lists it; without scripts the link jumps there."""
+        t = GL.definition(key)          # KeyError on an unknown term: fail loudly, never render a dead link
+        used = g.setdefault("terms_used", [])
+        if key not in used:
+            used.append(key)
+        return Markup(f'<a class=term href="#def-{key}" data-def="{key}">{escape(label or t.label)}</a>')
+
+    def terms_used() -> list:
+        return [(k, GL.DEFS[k]) for k in g.get("terms_used", [])]
+
+    app.jinja_env.globals.update(term=term, terms_used=terms_used, glossary_source=GL.SOURCE)
+
     @app.context_processor
     def nav():
         # export=1 renders read-only fragments for the static HTML export.

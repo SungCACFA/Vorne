@@ -1,0 +1,112 @@
+<div class=tip role=tooltip id=tip hidden></div>
+<div class=defpop role=dialog aria-modal=false aria-labelledby=defpop-h id=defpop hidden>
+  <button type=button class=defclose aria-label="Close definition">×</button>
+  <h3 id=defpop-h></h3><div class=defbody></div>
+</div>
+<script>
+// Chart tooltips and measure definitions. Without scripts nothing here is needed: chart marks keep their
+// SVG <title> (the browser's own tooltip) and every measure name links to the page's Definitions list.
+// With scripts: a tooltip that follows the cursor, flips at the edges and opens on tap; and a small
+// panel for each definition, opened by click or Enter, closed by Escape, a click elsewhere, or ×.
+// The static export embeds this same file, and the export swaps pages in and out, so everything is
+// event delegation - nothing is bound to a particular page's elements.
+(() => {
+  const tip = document.getElementById('tip'), pop = document.getElementById('defpop');
+  const SCOPE = '.chart, .spark, .comatrix, .inout';
+
+  // A mark's tooltip text: its SVG <title>, or its title attribute, moved to data-tip on first use so the
+  // browser's own tooltip does not appear on top of this one.
+  function tipText(el) {
+    const scope = el instanceof Element ? el.closest(SCOPE) : null;
+    if (!scope) return null;
+    for (let n = el; n && n !== scope.parentNode; n = n.parentNode) {
+      if (!(n instanceof Element)) continue;
+      if (n.dataset.tip) return [n, n.dataset.tip];
+      const t = n.querySelector(':scope > title');
+      if (t) { n.dataset.tip = t.textContent; t.remove(); return [n, n.dataset.tip]; }
+      if (n.hasAttribute('title') && !n.matches('a.term')) {
+        n.dataset.tip = n.getAttribute('title'); n.removeAttribute('title'); return [n, n.dataset.tip];
+      }
+    }
+    return null;
+  }
+  function place(el, x, y) {
+    const gap = 14, w = el.offsetWidth, h = el.offsetHeight;
+    let left = x + gap, top = y + gap;
+    if (left + w > innerWidth - 8) left = x - gap - w;          // flip left near the right edge
+    if (top + h > innerHeight - 8) top = y - gap - h;           // flip up near the bottom
+    el.style.left = Math.max(8, left) + 'px';
+    el.style.top = Math.max(8, top) + 'px';
+  }
+  let tipFor = null;
+  function showTip(mark, text, x, y) {
+    tip.textContent = text;
+    tip.hidden = false;
+    place(tip, x, y);
+    tipFor = mark;
+  }
+  function hideTip() { tip.hidden = true; tipFor = null; }
+  document.addEventListener('pointermove', ev => {
+    if (ev.pointerType === 'touch') return;
+    const got = tipText(ev.target);
+    got ? showTip(got[0], got[1], ev.clientX, ev.clientY) : hideTip();
+  }, {passive: true});
+  document.addEventListener('pointerleave', hideTip);
+  addEventListener('scroll', () => { if (tipFor && !tip.dataset.touch) hideTip(); }, {passive: true});
+  // Touch: a tap shows the mark's tooltip (a second tap on it, or a tap elsewhere, hides it). A tap on a
+  // heatmap row link still follows the link on the second tap.
+  document.addEventListener('pointerdown', ev => {
+    if (ev.pointerType !== 'touch') return;
+    const got = tipText(ev.target);
+    if (!got) { hideTip(); return; }
+    if (tipFor === got[0]) { hideTip(); return; }
+    showTip(got[0], got[1], ev.clientX, ev.clientY);
+    tip.dataset.touch = '1';
+    const link = got[0].closest('a');
+    if (link) link.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); }, {once: true, capture: true});
+  });
+
+  // Definitions: the text is the page's own Definitions list (rendered from webapp/glossary.py).
+  let opener = null;
+  function openDef(a) {
+    const body = document.querySelector(`[data-def-body="${CSS.escape(a.dataset.def)}"]`);
+    if (!body) return false;
+    pop.querySelector('h3').textContent = body.querySelector('dt').textContent;
+    pop.querySelector('.defbody').innerHTML = body.querySelector('dd').innerHTML;
+    pop.hidden = false;
+    const r = a.getBoundingClientRect();
+    pop.style.left = '0px'; pop.style.top = '0px';
+    let left = r.left, top = r.bottom + 8;
+    if (left + pop.offsetWidth > innerWidth - 8) left = innerWidth - 8 - pop.offsetWidth;
+    if (top + pop.offsetHeight > innerHeight - 8) top = r.top - 8 - pop.offsetHeight;
+    pop.style.left = Math.max(8, left) + 'px';
+    pop.style.top = Math.max(8, top) + 'px';
+    opener = a;
+    a.setAttribute('aria-expanded', 'true');
+    pop.querySelector('.defclose').focus();
+    return true;
+  }
+  function closeDef(refocus) {
+    if (pop.hidden) return;
+    pop.hidden = true;
+    if (opener) { opener.setAttribute('aria-expanded', 'false'); if (refocus) opener.focus(); }
+    opener = null;
+  }
+  document.addEventListener('click', ev => {
+    const a = ev.target.closest('a.term[data-def]');
+    if (a) {
+      ev.preventDefault(); ev.stopPropagation();
+      if (opener === a) { closeDef(true); return; }
+      closeDef(false);
+      if (!openDef(a)) location.hash = 'def-' + a.dataset.def;
+      return;
+    }
+    if (ev.target.closest('.defclose')) { closeDef(true); return; }
+    if (!pop.hidden && !ev.target.closest('#defpop')) closeDef(false);
+  }, true);
+  document.addEventListener('keydown', ev => {
+    if (ev.key === 'Escape') { if (!pop.hidden) closeDef(true); hideTip(); }
+  });
+  addEventListener('resize', () => closeDef(false));
+})();
+</script>

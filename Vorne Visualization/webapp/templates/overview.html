@@ -11,7 +11,7 @@ That reconciliation is what makes the rates below dependable.</p>
 <p class=empty>No records in this period.</p>
 {% else %}
 <table>
-<thead><tr><th>Line</th><td class=bar>Share of elapsed time</td>{{ rate_heads() }}<td>Scheduled h</td><td>Down h</td></tr></thead>
+<thead><tr><th>Line</th><td class=bar>Share of elapsed time</td>{{ rate_heads() }}<td>{{ term('scheduled', 'Scheduled h') }}</td><td>{{ term('down', 'Down h') }}</td></tr></thead>
 <tbody>
 {% for dev, t in rows %}
 <tr><th><a class=lnk href="{{ url_for('line', dev=dev) }}{{ win.query() }}">{{ dev }}</a></th><td class=bar>{{ stack(t) }}</td>
