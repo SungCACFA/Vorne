@@ -1,0 +1,35 @@
+<script>
+// The sticky band: the nav, and under it the page's bar (period controls, or the live status line).
+// They are two sticky siblings, so the bar sits exactly under the nav whatever the nav's height, and
+// on a narrow screen only the nav sticks. Their heights go to the stylesheet as --navh and --barh (for
+// the bar's offset and for in-page jumps). html.scrolled adds the shadow once the band floats over
+// content: a 1px sentinel just above the nav goes above the viewport exactly when the nav sticks. (A stuck
+// element's offsetTop moves with the scroll, so it cannot be the test.) The static export embeds this
+// same file.
+(() => {
+  const root = document.documentElement, nav = document.querySelector('nav');
+  if (!nav) return;
+  function measure() {
+    const bar = document.querySelector('[data-bar]');
+    root.style.setProperty('--navh', nav.offsetHeight + 'px');
+    const sticks = bar && !bar.hidden && getComputedStyle(bar).position === 'sticky';
+    root.style.setProperty('--barh', (sticks ? bar.offsetHeight : 0) + 'px');
+  }
+  const sentinel = document.createElement('div');
+  sentinel.setAttribute('aria-hidden', 'true');
+  sentinel.style.cssText = 'height:1px;margin-bottom:-1px';
+  nav.before(sentinel);
+  // The sentinel never sticks, so its own position says whether the band has left the masthead.
+  const floating = () => root.classList.toggle('scrolled', sentinel.getBoundingClientRect().top < 0);
+  addEventListener('scroll', floating, {passive: true});
+  addEventListener('resize', floating);
+  addEventListener('resize', measure);
+  addEventListener('load', measure);
+  // Heights change after load: the export fills its nav from script, the live bar is revealed by polling.
+  const ro = new ResizeObserver(measure);
+  ro.observe(nav);
+  for (const bar of document.querySelectorAll('[data-bar]')) ro.observe(bar);
+  measure();
+  floating();
+})();
+</script>

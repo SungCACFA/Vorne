@@ -42,6 +42,19 @@ charts:
 # Channels per BRIEF section 3. `instant` is deprecated - do not add it.
 channels: [shift_hour, shift, process_state, part, job, quality_event]
 
+# The live writer (/live): each device's real-time data into current_state.
+# Each device is read on its own every interval_seconds; a read that takes
+# longer than timeout_seconds fails and is shown as failed. The page re-reads
+# the table every poll_seconds. A panel is marked stale once its reading is
+# older than stale_after_seconds (default four intervals: 5 s writer and 5 s
+# poll jitter never trips it), so a stopped writer, an unreachable device or a
+# page that can no longer reach the server cannot pass for live.
+live:
+  interval_seconds: 5
+  timeout_seconds: 3
+  poll_seconds: 5
+  stale_after_seconds: 20
+
 devices:
   - {id: FR8,   host: 10.15.22.19}
   - {id: AreaB, host: 10.15.22.83}

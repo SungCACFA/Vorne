@@ -1,0 +1,16 @@
+{# Shared by the /live page and the /api/live panels; imported with context (tz, now). #}
+{% macro hm(seconds) -%}
+{%- if seconds is none -%}—{%- else -%}
+{%- set m = (seconds / 60)|round(0, 'floor')|int -%}
+{%- if m < 60 %}{{ m }} min{% elif m < 2880 %}{{ m // 60 }} h {{ '%02d'|format(m % 60) }} min{% else %}{{ '%.1f'|format(m / 1440) }} days{% endif -%}
+{%- endif -%}
+{%- endmacro %}
+{% macro h1(seconds) -%}{{ '%.1f'|format((seconds or 0) / 3600) }}{%- endmacro %}
+{% macro clock(ts) -%}{{ ts.astimezone(tz).strftime('%H:%M:%S') if ts else '—' }}{%- endmacro %}
+{# Today: 07:39. This week: Mon 08:40. Older: Mon 28 Sep 08:40. #}
+{% macro since(ts) -%}{%- if ts -%}{%- set t = ts.astimezone(tz) -%}{%- set days = (now.astimezone(tz).date() - t.date()).days -%}
+{{ t.strftime('%H:%M') if days == 0 else t.strftime('%a %H:%M') if days < 7 else t.strftime('%a %d %b %H:%M') }}{%- endif -%}{%- endmacro %}
+{% macro ago(seconds) -%}
+{%- set h = seconds / 3600 -%}
+{%- if h < 1 %}{{ (seconds / 60)|int }} min ago{% elif h < 48 %}{{ h|int }} h ago{% else %}{{ (h / 24)|round|int }} days ago{% endif -%}
+{%- endmacro %}

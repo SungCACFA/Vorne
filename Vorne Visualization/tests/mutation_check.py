@@ -32,6 +32,17 @@ mutation fails `pytest` without anyone running this. When you change a
 pinned line on purpose: re-read the mutation, make sure it still describes a
 real bug in the new code, then take the new pin from --pins.
 
+One run at a time, and nothing edited while it runs. A run holds
+.mutation_run.lock (created exclusively; a second run refuses to start) and
+keeps the original bytes of the file it has mutated in .mutation_run.original.
+It hashes every source file before the first mutation and checks them before
+and after each one. An edit made during a run would otherwise be wiped by the
+restore, or bake the mutation in, or change what later mutations test; so on
+any change the run stops, saves the edited file beside the original as
+<file>.edited-during-mutation, restores, and exits 3 with no verdict. If the
+lock is there and no run is active, a run was killed: --check shows whether a
+file was left mutated, and .mutation_run.original holds its original bytes.
+
 When you add a feature, add the mutation that would break it. When a
 mutation is missed, either write the test that catches it or record here
 why it is acceptable.
@@ -197,6 +208,75 @@ MUTATIONS: list[tuple[str, str, str, str]] = [
      "p=D.production_day(n).isoformat(), part=part)", "p=D.production_day(n).isoformat())"),
     ("part names no longer link to their product page", "webapp/__init__.py",
      "        return Markup(_part_link(p))", "        return escape(p)"),
+    # --- the guards themselves: the runner and the export. The runner's own targets are written as
+    # two adjacent strings, so this list does not contain the line it mutates (one match, not two).
+    ("runner: the pin check skipped", "tests/mutation_check.py",
+     "        elif pin_of(rel, old) " "!= PINS[name]:", "        elif False:"),
+    ("runner: a second run can start (lock not exclusive)", "tests/mutation_check.py",
+     "fd = os.open(LOCK, os.O_CREAT " "| os.O_EXCL | os.O_WRONLY)", "fd = os.open(LOCK, os.O_CREAT | os.O_WRONLY)"),
+    ("runner: an edit to the mutated file is wiped by the restore", "tests/mutation_check.py",
+     "            if written and " "path.read_bytes() != mutated:", "            if False:"),
+    ("runner: edits to other files mid-run go unnoticed", "tests/mutation_check.py",
+     "        if edited := changed_since(" "before, except_for=None):", "        if edited := []:"),
+    ("export: prune deletes files that are not exports", "webapp/export.py",
+     "if f.is_file() and f != keep and EXPORT_NAME.fullmatch(f.name)]", "if f.is_file() and f != keep]"),
+    ("export: --keep not passed through", "webapp/__main__.py",
+     "    build(out=args.out, keep=args.keep)", "    build(out=args.out)"),
+    # --- the live view
+    ("live: a failed read moves observed_at, so stale values look fresh", "xlpipe/live.py",
+     '"last_error = excluded.last_error", (device_id, attempted_at, error[:500]))',
+     '"last_error = excluded.last_error, observed_at = excluded.attempted_at", (device_id, attempted_at, error[:500]))'),
+    ("live: an old reading is not marked stale on the server", "webapp/live.py",
+     'r["stale"] = r["never_read"] or r["failing"] or r["age_s"] > stale_after',
+     'r["stale"] = r["never_read"] or r["failing"]'),
+    ("live: a failing device is not flagged", "webapp/live.py",
+     'r["failing"] = bool(r.get("last_error")) and', 'r["failing"] = False and'),
+    ("live: the browser never marks an ageing reading stale", "webapp/templates/live.html",
+     "const stale = p.dataset.failing === '1' || age > parseFloat(p.dataset.staleAfter);",
+     "const stale = p.dataset.failing === '1';"),
+    ("live: a state start from a different event is trusted", "xlpipe/live.py",
+     'if st.get("process_state_event_id") == ids.get("process_state_event_id") else None,',
+     "if True else None,"),
+    ("live: an empty table is rendered as panels", "webapp/live.py",
+     "    if not got:\n        return None", "    if False:\n        return None"),
+    ("live: availability leaves planned stops out", "webapp/live.py",
+     'r["availability"] = run / (run + unp + pln) if run + unp + pln > 0 else None',
+     'r["availability"] = run / (run + unp) if run + unp > 0 else None'),
+    # --- live auto-refresh
+    ("live: updates reload the whole page instead of updating in place", "webapp/templates/live.html",
+     "      apply(j);\n", "      location.reload();\n"),
+    ("live: a failed poll resets the ages, so a page cut off from the server looks current",
+     "webapp/templates/live.html",
+     "      S.failing = true;                          // keep the last values",
+     "      S.failing = true; S.t0 = performance.now(); // keep the last values"),
+    ("live: the marker never shows that updates have stopped", "webapp/templates/live.html",
+     "    dot.classList.toggle('down', S.failing);", "    dot.classList.toggle('down', false);"),
+    ("live: polling carries on while the tab is hidden", "webapp/templates/live.html",
+     "    if (document.hidden) return;                 // resumes on visibilitychange",
+     "    ;                                            // resumes on visibilitychange"),
+    ("live: showing the tab again does not read at once", "webapp/templates/live.html",
+     "document.addEventListener('visibilitychange', () => { document.hidden ? clearTimeout(S.timer) : poll(); });",
+     "document.addEventListener('visibilitychange', () => { clearTimeout(S.timer); });"),
+    ("live: stale threshold default back to three intervals", "webapp/__init__.py",
+     '"stale_after": float(live_cfg.get("stale_after_seconds", 4 * interval)),',
+     '"stale_after": float(live_cfg.get("stale_after_seconds", 3 * interval)),'),
+    ("live: a long state shows only the counted time", "webapp/templates/_live_panel.html",
+     "wall - r.state_elapsed_s > 600 %}", "wall - r.state_elapsed_s > 10 ** 9 %}"),
+    ("live: days ago truncated (Friday to Wednesday reads 4 days)", "webapp/templates/_live_macros.html",
+     "{{ (h / 24)|round|int }} days ago", "{{ (h / 24)|int }} days ago"),
+    # --- the sticky band
+    ("sticky: the nav scrolls away", "webapp/static/style.css",
+     "nav{position:sticky;top:0;z-index:30;", "nav{position:static;top:0;z-index:30;"),
+    ("sticky: the bar sticks at the top, under the nav", "webapp/static/style.css",
+     "[data-bar]{position:sticky;top:var(--navh);", "[data-bar]{position:sticky;top:0;"),
+    ("sticky: on a phone the bar sticks too", "webapp/static/style.css",
+     "  [data-bar]{position:static;box-shadow:none}", "  [data-bar]{box-shadow:none}"),
+    ("sticky: in-page jumps land under the band", "webapp/static/style.css",
+     "html{scroll-padding-top:calc(var(--navh) + var(--barh) + 12px)}", "html{}"),
+    ("sticky: the band never shows it is floating", "webapp/templates/_sticky.html",
+     "sentinel.getBoundingClientRect().top < 0)", "sentinel.getBoundingClientRect().top < -1e9)"),
+    ("sticky: the nav's real height is never measured", "webapp/templates/_sticky.html",
+     "    root.style.setProperty('--navh', nav.offsetHeight + 'px');", "    ;"),
 ]
 
 
@@ -276,6 +356,45 @@ def run_suite() -> tuple[int, int]:
     return failed, passed
 
 
+LOCK = ROOT / ".mutation_run.lock"
+BACKUP = ROOT / ".mutation_run.original"
+WATCHED = ("webapp", "xlpipe", "tests")
+
+
+class EditedDuringRun(RuntimeError):
+    pass
+
+
+def snapshot() -> dict[Path, str]:
+    """Hash of every source file the suite could depend on."""
+    files = [ROOT / "config.yaml", ROOT / "verify.py", ROOT / "schema.sql"]
+    for d in WATCHED:
+        files += [f for f in (ROOT / d).rglob("*") if f.is_file() and f.suffix in (".py", ".html", ".css", ".yaml")
+                  and "__pycache__" not in f.parts and "fixtures" not in f.parts]
+    return {f: hashlib.sha256(f.read_bytes()).hexdigest() for f in files if f.exists()}
+
+
+def changed_since(before: dict[Path, str], *, except_for: Path | None = None) -> list[str]:
+    now = snapshot()
+    return sorted(str(f.relative_to(ROOT)) for f in set(before) | set(now)
+                  if f != except_for and before.get(f) != now.get(f))
+
+
+def take_lock() -> bool:
+    try:
+        fd = os.open(LOCK, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        return False
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(f"pid {os.getpid()}, started {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+    return True
+
+
+def note_in_lock(line: str) -> None:
+    with open(LOCK, "a", encoding="utf-8") as f:
+        f.write(line + "\n")
+
+
 def clear_bytecode() -> None:
     for d in ROOT.glob("**/__pycache__"):
         if ".venv" not in d.parts:
@@ -305,15 +424,35 @@ def main(argv: list[str]) -> int:
         print(f"all {len(MUTATIONS)} mutations pinned and applicable")
         return 0
     chosen = [int(a) for a in argv if a.isdigit()] or list(range(1, len(MUTATIONS) + 1))
+    if not take_lock():
+        print(f"refusing to run: {LOCK.name} exists, so another mutation run is active or one was killed.\n"
+              + LOCK.read_text(encoding="utf-8")
+              + "If no run is active: run --check (a killed run can leave a file mutated; the original bytes "
+                f"are in {BACKUP.name}), put that file right, then delete {LOCK.name}.")
+        return 2
+    try:
+        return _run(chosen)
+    except EditedDuringRun as exc:
+        print(f"\nSTOPPED: {exc}\nNo verdict: the results above were run against code that was changing.")
+        return 3
+    finally:
+        BACKUP.unlink(missing_ok=True)
+        LOCK.unlink(missing_ok=True)
+
+
+def _run(chosen: list[int]) -> int:
     clear_bytecode()
     base_failed, _ = run_suite()
     if base_failed:
         print("the suite fails without any mutation; fix that first")
         return 2
     caught = 0
+    before = snapshot()
     for i in chosen:
         name, rel, old, new = MUTATIONS[i - 1]
         path = ROOT / rel
+        if edited := changed_since(before):
+            raise EditedDuringRun(f"source changed during the run, before #{i}: {', '.join(edited)}")
         original = path.read_bytes()
         text = original.decode("utf-8")
         crlf = (old.replace(chr(10), chr(13) + chr(10)), new.replace(chr(10), chr(13) + chr(10)))
@@ -321,17 +460,32 @@ def main(argv: list[str]) -> int:
             old, new = crlf   # the file has Windows line endings
         if text.count(old) != 1:     # verify() passed, so the file changed during this run
             raise RuntimeError(f"#{i} {name}: {rel} changed while mutating; stop and look")
+        written = False
         try:
             mutated = text.replace(old, new).encode("utf-8")
             assert mutated != original, f"#{i} {name}: mutation changed nothing"
+            BACKUP.write_bytes(original)
+            note_in_lock(f"#{i} applied to {rel}")
             path.write_bytes(mutated)
+            written = True
             clear_bytecode()
             failed, _ = run_suite()
         finally:
+            if written and path.read_bytes() != mutated:      # someone saved this file while it was mutated
+                kept = path.with_name(path.name + ".edited-during-mutation")
+                kept.write_bytes(path.read_bytes())
+                path.write_bytes(original)
+                os.utime(path, None)
+                clear_bytecode()
+                raise EditedDuringRun(f"{rel} was edited while #{i} was applied. The original is restored; "
+                                      f"the edited version (mutation #{i} included) is in {kept.name}")
             path.write_bytes(original)
             os.utime(path, None)
             clear_bytecode()
             assert path.read_bytes() == original, f"could not restore {rel}"
+        note_in_lock(f"#{i} restored")
+        if edited := changed_since(before, except_for=None):
+            raise EditedDuringRun(f"source changed while #{i} ran: {', '.join(edited)}")
         caught += bool(failed)
         print(f"{i:3}  {'caught' if failed else 'MISSED'}  {name}", flush=True)
     print(f"\n{caught} of {len(chosen)} mutations caught")
@@ -404,6 +558,33 @@ PINS: dict[str, str] = {
     'line filter: heatmap paints other products as the chosen one': '7883f99cfbc3',
     'line filter: heatmap day links drop the product': '8650b32ead95',
     'part names no longer link to their product page': 'b0e63485aed9',
+    'runner: the pin check skipped': '7740469144e3',
+    'runner: a second run can start (lock not exclusive)': '1d375222c0bf',
+    'runner: an edit to the mutated file is wiped by the restore': 'b1d833c07690',
+    'runner: edits to other files mid-run go unnoticed': '32ef1c447fbf',
+    'export: prune deletes files that are not exports': 'a32f03418071',
+    'export: --keep not passed through': '0b7165be6e10',
+    'live: a failed read moves observed_at, so stale values look fresh': 'cd59109bb519',
+    'live: an old reading is not marked stale on the server': 'c03266c004ad',
+    'live: a failing device is not flagged': 'f48a75f91b31',
+    'live: the browser never marks an ageing reading stale': '78cae1df1b99',
+    'live: a state start from a different event is trusted': 'fa1eea2c9df5',
+    'live: an empty table is rendered as panels': '52c92d458650',
+    'live: availability leaves planned stops out': '9b2669783896',
+    'live: updates reload the whole page instead of updating in place': 'db89b4f0e6f0',
+    'live: a failed poll resets the ages, so a page cut off from the server looks current': '867cda0b4ba1',
+    'live: the marker never shows that updates have stopped': '2fe9d2451ba8',
+    'live: polling carries on while the tab is hidden': 'f28f2449a1b0',
+    'live: showing the tab again does not read at once': '2e2748186089',
+    'live: stale threshold default back to three intervals': 'c953fae5df8c',
+    'live: a long state shows only the counted time': '1dacdab8bebe',
+    'live: days ago truncated (Friday to Wednesday reads 4 days)': 'a7f0be74c227',
+    'sticky: the nav scrolls away': 'a001190b3817',
+    'sticky: the bar sticks at the top, under the nav': '0ca1f87afa6b',
+    'sticky: on a phone the bar sticks too': '12b266adde35',
+    'sticky: in-page jumps land under the band': '99188d275640',
+    'sticky: the band never shows it is floating': '14e69f76903f',
+    "sticky: the nav's real height is never measured": 'ddecfa9fb0d8',
 }
 
 

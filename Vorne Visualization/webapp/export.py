@@ -104,7 +104,24 @@ def _freeze_data_layer(snap: D.Snapshot, opens: list) -> dict:
     return saved
 
 
-def build(config_path: str | Path | None = None, out: str | Path | None = None, log=print) -> Path:
+# The export's own file names. Only these are ever pruned.
+EXPORT_NAME = re.compile(r"danbro_\d{4}-\d{2}-\d{2}_\d{4}\.html")
+
+
+def prune(keep: Path, log=print) -> list[Path]:
+    """Delete every earlier export beside `keep`, so the folder only ever
+    holds the current snapshot and an old one cannot be the one attached to
+    an email. Only files named like an export are touched."""
+    gone = [f for f in keep.parent.iterdir()
+            if f.is_file() and f != keep and EXPORT_NAME.fullmatch(f.name)]
+    for f in gone:
+        f.unlink()
+        log(f"deleted the earlier export {f.name}")
+    return gone
+
+
+def build(config_path: str | Path | None = None, out: str | Path | None = None, log=print,
+          keep: bool = False) -> Path:
     app = create_app(config_path) if config_path else create_app()
     cache = app.config["CACHE_PATH"]
     snap = D.load(cache)
@@ -180,7 +197,8 @@ def build(config_path: str | Path | None = None, out: str | Path | None = None, 
     raw = json.dumps(bundle, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     packed = base64.b64encode(gzip.compress(raw, compresslevel=9)).decode("ascii")
     css = (ROOT / "webapp" / "static" / "style.css").read_text(encoding="utf-8")
-    html = (SHELL.replace("/*CSS*/", css)
+    sticky = (ROOT / "webapp" / "templates" / "_sticky.html").read_text(encoding="utf-8")
+    html = (SHELL.replace("/*CSS*/", css).replace("/*STICKY*/", sticky)
                  .replace("__BUNDLE__", packed)
                  .replace("__EXPORTED__", bundle["stamp"]["exported"]))
 
@@ -189,6 +207,8 @@ def build(config_path: str | Path | None = None, out: str | Path | None = None, 
     out.write_text(html, encoding="utf-8")
     log(f"wrote {out} ({out.stat().st_size / 1e6:.1f} MB; {len(raw) / 1e6:.1f} MB before compression, "
         f"{len(strings)} distinct fragments, {len(chunks):,} distinct chunks)")
+    if not keep:     # only once the new file is safely written
+        prune(out, log)
     return out
 
 
@@ -203,16 +223,16 @@ SHELL = r"""<!doctype html><html lang=en><meta charset=utf-8>
 .stamp strong{color:var(--ink);font-weight:600}
 #loading{color:var(--mute);padding:28px 0}
 nav button{background:none;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;
-padding:9px 12px;font:inherit;font-weight:600;color:var(--mute);cursor:pointer}
+padding:8px 12px;font:inherit;font-weight:600;color:var(--mute);cursor:pointer}
 nav button[aria-current=page]{color:var(--ink);border-bottom-color:var(--ink)}
-@media print{.ctrl,nav{display:none}.scroll{max-height:none;overflow:visible}}
+@media print{.ctrl,nav{display:none}}
 </style>
 <div class=wrap>
 <h1>Danbro packaging</h1>
 <p class=sub id=sub></p>
 <p class=stamp id=stamp></p>
 <nav id=nav></nav>
-<div class=ctrl>
+<div class=ctrl data-bar>
   <div class=seg role=group aria-label=Granularity id=gran></div>
   <label class=sr for=period>Period</label><select id=period></select>
   <span id=ndays></span>
@@ -220,6 +240,7 @@ nav button[aria-current=page]{color:var(--ink);border-bottom-color:var(--ink)}
 <main id=main><p id=loading>Opening the snapshot…</p></main>
 <footer id=foot></footer>
 </div>
+/*STICKY*/
 <script>
 const PACKED = "__BUNDLE__";
 let B = null, page = 'overview', gran = 'month', period = null;

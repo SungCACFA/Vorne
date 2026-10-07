@@ -108,6 +108,13 @@ def create_app(config_path: str | Path = ROOT / "config.yaml") -> Flask:
         "min_shift": float(charts_cfg.get("rhythm_change_min_shift", C.RHYTHM_MIN_SHIFT)),
         "min_t": float(charts_cfg.get("rhythm_change_min_t", C.RHYTHM_MIN_T)),
     }
+    live_cfg = cfg.get("live") or {}
+    interval = float(live_cfg.get("interval_seconds", 5))
+    app.config["LIVE"] = {"interval": interval,
+                          # 20 s by default: four writer cycles, so 5 s writer / 5 s poll jitter never trips it
+                          "stale_after": float(live_cfg.get("stale_after_seconds", 4 * interval)),
+                          "poll": float(live_cfg.get("poll_seconds", interval)),
+                          "devices": [d["id"] for d in cfg.get("devices") or []]}
     app.config["ICT_TOLERANCE"] = float(charts_cfg.get("ict_change_tolerance", D.ICT_TOLERANCE))
     default_rule = D.ImplausibleRule()
     app.config["IMPLAUSIBLE"] = D.ImplausibleRule(
@@ -490,6 +497,48 @@ def create_app(config_path: str | Path = ROOT / "config.yaml") -> Flask:
         else:
             D.save_standard(app.config["CACHE_PATH"], part, epc=v)
         return jsonify(ok=True)
+
+    # ---------------------------------------------------------------- live
+
+    def live_context(devices: list[str]) -> dict:
+        """What the /live page and /api/live both show: the current_state table only."""
+        from datetime import datetime, timezone
+
+        from . import live as L
+
+        cfg = app.config["LIVE"]
+        now = datetime.now(timezone.utc)
+        rows = L.readings(app.config["CACHE_PATH"], cfg["devices"] or devices, now, cfg["stale_after"])
+        read = [r for r in rows or [] if r["age_s"] is not None]
+        # link a part only where it has a product page (one closed run at least)
+        known = {r["part"] for r in rows or [] if r.get("part") and D.part_days(app.config["CACHE_PATH"], r["part"])}
+        return {"rows": rows, "now": now, "known_parts": known,
+                "oldest": max(read, key=lambda r: r["age_s"], default=None),
+                "never": [r["device_id"] for r in rows or [] if r["age_s"] is None],
+                "stale_after": cfg["stale_after"], "interval": cfg["interval"], "poll": cfg["poll"],
+                "impact_name": C.LABEL, "tz": D.TZ}
+
+    @app.route("/live")
+    def live_view():
+        """Current state, read from the current_state table only. Never calls a device."""
+        snap = D.load(app.config["CACHE_PATH"])
+        return render_template("live.html", snap=snap, win=select_window(snap, request.args), page="live",
+                               **live_context(snap.devices))
+
+    @app.get("/api/live")
+    def live_api():
+        """The current_state rows as JSON, each with its panel rendered by the page's own template, so
+        the page can update in place. Reads the table only."""
+        from datetime import datetime
+
+        ctx = live_context([])
+        rows = []
+        for r in ctx["rows"] or []:
+            raw = {k: v for k, v in r.items() if not isinstance(v, datetime)}
+            rows.append({**raw, "html": render_template("_live_panel.html", r=r, **ctx)})
+        return jsonify(never_run=ctx["rows"] is None, server_time=ctx["now"].isoformat(),
+                       stale_after=ctx["stale_after"], rows=rows,
+                       top_html=render_template("_live_top.html", **ctx) if ctx["rows"] is not None else "")
 
     @app.get("/products/standards.csv")
     def export_standards():

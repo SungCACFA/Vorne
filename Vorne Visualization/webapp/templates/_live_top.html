@@ -1,0 +1,3 @@
+{%- if oldest %}Oldest reading: <strong>{{ oldest.device_id }}</strong>, taken
+<strong data-age data-age0="{{ '%.1f'|format(oldest.age_s) }}">{{ oldest.age_s|int }} s</strong> ago{% endif %}
+{%- if never %}{{ ' · ' if oldest }}<strong>{{ never|join(', ') }}</strong> never read{% endif %}

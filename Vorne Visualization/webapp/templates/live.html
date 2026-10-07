@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Live · Danbro packaging{% endblock %}
+{% block sub %}Live · what each line is doing now{% endblock %}
+
+{% block bar %}
+<div class=liveline data-bar data-oldest data-stale-after="{{ stale_after }}"{% if rows is none %} hidden{% endif %}>
+  <span class=lnum data-top>{% include "_live_top.html" %}</span>
+  <span class=lverdict data-verdict></span>
+  <span class=lpoll data-poll title="Updates every {{ poll|int }} seconds">updating</span>
+  <form method=get action="{{ url_for('live_view') }}" data-refresh><button type=submit>Refresh</button></form>
+</div>
+{% endblock %}
+
+{% block body %}
+<div class=flag role=alert data-never {% if rows is not none %}hidden{% endif %}>
+<h2>The live writer has never run</h2>
+<p><strong>There is no reading from any line yet.</strong> This page shows only what the live writer has stored, and
+nothing has been stored. Start the app with <code>python -m webapp</code> (which runs the writer), or run
+<code>python -m xlpipe live</code> on its own. This page checks again every {{ poll|int }} seconds.</p></div>
+
+<p class=note title="The live writer reads each line every {{ interval|int }} s and stores it; this page reads the stored
+readings every {{ poll|int }} s. A panel goes stale when its reading is older than {{ stale_after|int }} s or its last read
+failed. Availability = run ÷ (run + unplanned + planned) for the shift so far; performance = ideal ÷ run.">Updates every
+{{ poll|int }} s · stale after {{ stale_after|int }} s · no piece counts. Details in the footer.</p>
+
+<div class=livegrid data-grid>
+{% for r in rows or [] %}{% include "_live_panel.html" %}{% endfor %}
+</div>
+
+<script>
+// Ages count up from the age each reading had when the server last answered, on the browser's own
+// monotonic clock, so a wrong clock on the screen cannot make an old reading look fresh. A failed poll
+// changes nothing on screen, so the ages keep climbing and go stale: a break between browser and
+// server shows, just like a stopped writer or an unreachable device.
+(() => {
+  const API = {{ url_for('live_api')|tojson }}, EVERY = {{ (poll * 1000)|int }};
+  const S = {t0: performance.now(), lastOk: performance.now(), failing: false, polls: 0, timer: null};
+  const fmt = s => s < 60 ? Math.floor(s) + ' s'
+                 : s < 3600 ? Math.floor(s / 60) + ' min ' + String(Math.floor(s % 60)).padStart(2, '0') + ' s'
+                 : Math.floor(s / 3600) + ' h ' + String(Math.floor(s % 3600 / 60)).padStart(2, '0') + ' min';
+  function tick() {
+    const dt = (performance.now() - S.t0) / 1000;
+    let staleCount = 0, n = 0;
+    for (const p of document.querySelectorAll('[data-panel]')) {
+      n++;
+      if (p.dataset.age0 === '') { staleCount++; continue; }          // never read: stale by definition
+      const age = parseFloat(p.dataset.age0) + dt;
+      const stale = p.dataset.failing === '1' || age > parseFloat(p.dataset.staleAfter);
+      p.classList.toggle('stale', stale);
+      staleCount += stale;
+      for (const a of p.querySelectorAll('[data-age]')) a.textContent = fmt(age);
+    }
+    const top = document.querySelector('[data-oldest]');
+    const a = top.querySelector('[data-age]');
+    if (a) a.textContent = fmt(parseFloat(a.dataset.age0) + dt);
+    top.classList.toggle('stale', staleCount > 0);
+    top.querySelector('[data-verdict]').textContent = !n ? ''
+      : staleCount === 0 ? (n === 1 ? 'The line is current' : 'All ' + n + ' lines current')
+      : staleCount + ' of ' + n + ' line' + (n === 1 ? '' : 's') + ' stale';
+    const dot = top.querySelector('[data-poll]');
+    dot.classList.toggle('down', S.failing);
+    dot.textContent = S.failing ? 'no update for ' + fmt((performance.now() - S.lastOk) / 1000) : 'updating';
+  }
+  function apply(j) {
+    document.querySelector('[data-never]').hidden = !j.never_run;
+    document.querySelector('[data-oldest]').hidden = j.never_run;
+    const grid = document.querySelector('[data-grid]');
+    for (const r of j.rows) {
+      const old = grid.querySelector(`[data-panel][data-device="${CSS.escape(r.device_id)}"]`);
+      const t = document.createElement('template');
+      t.innerHTML = r.html.trim();
+      old ? old.replaceWith(t.content.firstElementChild) : grid.append(t.content.firstElementChild);
+    }
+    document.querySelector('[data-top]').innerHTML = j.top_html;
+  }
+  async function poll() {
+    clearTimeout(S.timer);
+    if (document.hidden) return;                 // resumes on visibilitychange
+    const ctl = new AbortController(), kill = setTimeout(() => ctl.abort(), Math.min(4000, EVERY));
+    try {
+      const res = await fetch(API, {cache: 'no-store', signal: ctl.signal});
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const j = await res.json();
+      apply(j);
+      S.t0 = S.lastOk = performance.now();       // every age0 just arrived from the server
+      S.failing = false;
+      document.body.dataset.polls = ++S.polls;
+      const dot = document.querySelector('[data-poll]');
+      dot.classList.remove('beat'); void dot.offsetWidth; dot.classList.add('beat');
+    } catch (e) {
+      S.failing = true;                          // keep the last values; their ages keep climbing
+    } finally {
+      clearTimeout(kill);
+      tick();
+      if (!document.hidden) S.timer = setTimeout(poll, EVERY);
+    }
+  }
+  // Background tabs throttle timers, which would show a false age: pause while hidden, read at once on return.
+  document.addEventListener('visibilitychange', () => { document.hidden ? clearTimeout(S.timer) : poll(); });
+  document.querySelector('[data-refresh]').addEventListener('submit', ev => { ev.preventDefault(); poll(); });
+  tick();
+  setInterval(tick, 1000);
+  S.timer = setTimeout(poll, EVERY);
+})();
+</script>
+{% endblock %}
+
+{% block footer %}
+<p>Live readings come from each device's real-time data, read by the live writer every {{ interval|int }} seconds and
+stored in the current_state table; this page reads only that table, every {{ poll|int }} seconds, and never contacts a
+device. "Read at" is the moment the writer took the reading, and every age counts up from it. A panel is marked stale
+when its reading is older than {{ stale_after|int }} seconds or its last read failed: the writer has stopped, the device
+is unreachable, or this page cannot reach the server (the marker beside Refresh then says how long since the last
+update). Polling pauses while the tab is hidden and reads at once when it is shown again.</p>
+<p>Shift figures are the device's own for the shift so far. Availability = run ÷ (run + unplanned + planned), the site's
+convention; performance = ideal ÷ run. Time in the present state is the device's own count, which leaves out breaks and
+unscheduled time inside the state; where the wall clock since it began is well past that, both are shown. No piece
+counts are shown anywhere until the count inputs are reviewed.</p>
+{% endblock %}

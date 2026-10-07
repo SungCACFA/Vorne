@@ -150,3 +150,71 @@ svg a text{fill:var(--ink);text-decoration:underline}
 .pair h3{margin-top:4px}
 @media(max-width:700px){.pair{grid-template-columns:1fr}}
 @media print{.partfilter{display:none}}
+/* live: big enough to read from a few feet away */
+body:has(.livegrid) .wrap{max-width:none}
+.liveline{display:flex;flex-wrap:wrap;gap:18px;align-items:center;font-size:22px;padding:12px 16px;margin:8px 0 6px;
+border-left:6px solid var(--run);background:var(--panel)}
+.liveline.stale{border-left-color:var(--unp)}
+.liveline .lverdict{font-weight:600}
+.liveline.stale .lverdict{color:var(--unp)}
+.liveline form{margin-left:auto}
+.liveline button{font:inherit;font-size:18px;font-weight:600;padding:8px 22px;cursor:pointer;background:#fff;
+border:2px solid var(--ink);color:var(--ink)}
+.livegrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px;margin-top:18px}
+@media(max-width:900px){.livegrid{grid-template-columns:1fr}}
+.lpanel{border-top:2px solid var(--ink);padding:10px 0 4px;position:relative}
+.lpanel h2{font-size:30px;margin:0 0 10px;border:0;padding:0}
+.lstate{font-size:58px;font-weight:800;line-height:1.05;margin:0;padding:14px 18px;color:#fff}
+.lstate.imp-run{background:var(--run)} .lstate.imp-unp{background:var(--unp)}
+.lstate.imp-pln{background:var(--pln);color:var(--ink)} .lstate.imp-nsc{background:var(--nsc);color:var(--ink)}
+.lreason{font-size:30px;font-weight:600;margin:10px 0 0}
+.lin{font-size:22px;margin:8px 0 14px}
+.lin small{display:block;font-size:15px;color:var(--mute)}
+.lfacts{display:grid;grid-template-columns:max-content 1fr;gap:6px 18px;font-size:22px;margin:0}
+.lfacts dt{color:var(--mute)} .lfacts dd{margin:0}
+.lread{font-size:18px;color:var(--mute);margin:14px 0 0}
+.lread strong{color:var(--ink)}
+.lstalebar{display:none;font-size:18px;margin:0 0 10px;padding:8px 12px;background:#FBEDEC;border-left:6px solid var(--unp)}
+.lpanel.stale .lstalebar{display:block}
+.lpanel.stale .lvals{opacity:.45;filter:grayscale(1)}
+.lpanel.stale .lread{color:var(--unp)}
+.lfail{font-size:22px;padding:12px 16px;background:#FBEDEC;border-left:6px solid var(--unp)}
+/* live: polling marker - a dot that blinks once per update, red text when updates stop */
+.lpoll{font-size:15px;color:var(--mute);white-space:nowrap}
+.lpoll::before{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--run);
+margin-right:7px;vertical-align:1px}
+.lpoll.beat::before{animation:beat .9s ease-out}
+@keyframes beat{0%{opacity:.15}100%{opacity:1}}
+.lpoll.down{color:var(--unp);font-weight:600}
+.lpoll.down::before{background:var(--unp)}
+@media(prefers-reduced-motion:reduce){.lpoll.beat::before{animation:none}}
+/* ---- the sticky band: nav, and directly under it the page's bar (period controls, or the live
+   status line). Two sticky siblings; _sticky.html measures them into --navh / --barh. The masthead
+   scrolls away. Kept under ~90px on a laptop: the bar is compact and does not wrap at 1280px. */
+:root{--navh:41px;--barh:46px}
+html{scroll-padding-top:calc(var(--navh) + var(--barh) + 12px)}   /* in-page jumps land below the band */
+nav{position:sticky;top:0;z-index:30;background:#fff;margin:0 -24px 0;padding:0 24px}
+nav a{padding:8px 12px}
+[data-bar]{position:sticky;top:var(--navh);z-index:29;margin-top:10px;margin-bottom:22px;
+box-shadow:-24px 0 0 #fff,24px 0 0 #fff}                          /* cover the gutters either side */
+.ctrl[data-bar]{padding:7px 12px;gap:12px}
+.ctrl[data-bar] .seg button{padding:5px 11px}
+.ctrl[data-bar] select{padding:5px 8px}
+.liveline[data-bar]{padding:8px 14px;margin-top:10px}
+.liveline[data-bar] button{padding:5px 18px}
+html.scrolled [data-bar]{box-shadow:-24px 0 0 #fff,24px 0 0 #fff,0 1px 0 var(--rule),0 8px 12px -8px rgba(21,25,27,.28)}
+/* narrow screens: only the nav sticks, so the band does not take half a phone */
+@media(max-width:700px){
+  [data-bar]{position:static;box-shadow:none}
+  html.scrolled [data-bar]{box-shadow:none}
+  html.scrolled nav{box-shadow:0 1px 0 var(--rule),0 8px 12px -8px rgba(21,25,27,.28)}
+  html{scroll-padding-top:calc(var(--navh) + 12px)}
+}
+@media print{nav,[data-bar]{position:static;box-shadow:none}}
+.liveline[data-bar]{font-size:19px;padding:6px 14px}
+.liveline[data-bar] button{font-size:16px;padding:3px 16px}
+@media(max-width:700px){
+  nav{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}   /* one row on a phone, swipe for the rest */
+  nav::-webkit-scrollbar{display:none}
+  nav a{white-space:nowrap}
+}

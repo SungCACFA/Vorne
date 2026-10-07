@@ -46,9 +46,10 @@ when there are, they go in `.env`, which is git-ignored.
 | `python -m xlpipe refresh --record DIR` | Also save every raw device response. This is how the test fixtures were made. |
 | `python -m xlpipe report` | What the cache holds: rows, date ranges, epochs, the brief's claims checked. |
 | `python verify.py` | Is the sync *correct*? Cache totals against the device's own aggregates, plus the data checks below. Exit 1 on any failure. |
-| `python -m webapp [--port N]` | The app. Reads the cache on every request, so a refresh shows on the next page load. |
-| `python -m webapp export [--out FILE]` | A self-contained, read-only HTML snapshot of every page, product page and period (≈3 min, ≈2.6 MB). See below. |
-| `python -m pytest` | 290 tests, no device needed (≈7 min, most of it the export tests). |
+| `python -m webapp [--port N]` | The app. Reads the cache on every request, so a refresh shows on the next page load. Also runs the live writer for `/live` (`--no-live-writer` to leave it to a separate process). |
+| `python -m xlpipe live [--interval S]` | The live writer on its own: every device's real-time data into `current_state`, every 5 s. One writer at a time. |
+| `python -m webapp export [--out FILE] [--keep]` | A self-contained, read-only HTML snapshot of every page, product page and period (≈3 min, ≈2.6 MB). Deletes earlier exports in the same folder unless `--keep`. See below. |
+| `python -m pytest` | 344 tests, no device needed (≈4–7 min, most of it the export tests). |
 | `python tests/mutation_check.py` | Would the tests notice if the code were wrong? See Tests. |
 | `python preflight.py` | When there is a database path: DNS, TCP 5432, TLS, auth, permissions, latency, as separate steps. |
 
@@ -226,6 +227,58 @@ time run by run, with reconfigurations marked; changeover cost in and out of it.
 parts) and the state events the device attributes to it, open run included. The heatmap shows other products' time
 in white. Calendar use under the filter is scheduled ÷ elapsed while that part was on the line. Live app only.
 
+## The sticky band
+
+On every page the nav stays at the top while scrolling, with the page's bar directly under it: the granularity and
+period controls, or on `/live` the status line with the oldest reading. The masthead scrolls away. On a laptop the
+band is 88-89 px (measured at 1024 and 1280 px wide); below 700 px only the nav sticks, on one row that scrolls
+sideways (42 px). Once the band floats over content it gets a hairline and a soft shadow.
+
+- Two sticky siblings rather than one sticky wrapper, so the bar can stop sticking on a phone while the nav keeps
+  sticking. `_sticky.html` measures both into `--navh` / `--barh`; the bar sits at `top: var(--navh)`.
+- In-page jumps (a heatmap day scrolling to the hour table) land below the band: `scroll-padding-top` on the page.
+- The page tables have no sticky headers of their own: the `class=scroll` wrappers carry no styling, so nothing can
+  hide under the band.
+- The export uses its own shell, with the same classes, the inlined stylesheet and the same `_sticky.html`.
+- The open-run alerts and the history panel now sit below the bar, since the bar has to be directly under the nav.
+
+## Live view (`/live`)
+
+What each line is doing now: state in large type in its impact colour, the reason, part and job, the shift and how far
+into it, run / down / planned hours and availability / performance for the shift so far, and how long the line has
+been in its present state. No piece counts. Live only: not in the static export.
+
+    devices -> live writer -> current_state table -> /live
+
+- **The writer** (`xlpipe/live.py`) reads `api/v0/real_time/data` and the open process-state event from each device,
+  one thread per device, every `live.interval_seconds` (5), with a `timeout_seconds` (3) limit, so a slow or dead
+  device only delays its own row. A good read replaces the row and stamps `observed_at` with when it was taken; a
+  failed read changes only `attempted_at` and `last_error`, so the last good values keep their real age. It runs
+  inside `python -m webapp` or alone as `python -m xlpipe live`; a lock beside the cache allows one at a time.
+- **The page reads only `current_state`** and never calls a device: any number of viewers cost one write loop, and the
+  table's twin in `schema.sql` means moving it to Postgres changes nothing in the view. No row at all: the page says
+  the writer has never run, and keeps checking.
+- **It updates itself in place.** Every `poll_seconds` (5) the browser reads `/api/live` - the rows as JSON, each with
+  its panel rendered by the page's own template - and swaps the panels; no page reload, so no flicker and no lost
+  scroll position. Each poll waits for the last (4 s limit). A failed poll changes nothing on screen: the values
+  stay and their ages keep climbing into stale, and the marker beside Refresh turns red with how long since the last
+  update, so a break between browser and server shows like any other. Polling pauses while the tab is hidden
+  (background tabs throttle timers, which would show a false age) and reads at once when it is shown. Refresh reads
+  immediately.
+- **Ages are of the reading, not the page.** The server renders each reading's age; the browser counts it up every
+  second on its own monotonic clock, so a wrong clock on the screen cannot make an old reading look fresh. A panel is
+  stale once its reading is older than `stale_after_seconds` (20: four writer cycles, so 5 s writer / 5 s poll jitter
+  never trips it) or its last read failed: greyed, with the failure and the age of the values shown. With updates
+  running it appears only when something is wrong: the writer stopped, a device unreachable, or the server out of
+  reach. A line never read shows no numbers at all. The line at the top gives the oldest reading, which lines were
+  never read, and how many are stale.
+- Availability and performance use the site's conventions (run ÷ (run + unplanned + planned); ideal ÷ run) from the
+  device's own shift times, not the device's own percentages. Time in the present state is the device's own, which
+  leaves out breaks and unscheduled time inside it. Where the wall clock since the state began is more than ten
+  minutes past that, both are shown: "3 h 06 min counted · since Mon 08:40 (2 days ago)".
+- Shift names are the devices' display names. The underlying codes disagree between lines (AreaB's 07:00 shift is
+  `second_shift`, FR8's is `first_shift`), so never compare shifts across lines by code.
+
 ## Static HTML export
 
 `python -m webapp export` writes `exports/danbro_<date>_<time>.html`: one file with every page (overview, the four
@@ -239,8 +292,9 @@ no server and fetches nothing: open it in Edge, Chrome or Firefox, or attach it 
   in every day, week, month and year view: 6.1 MB. The browser rebuilds a page only when it is shown. The export
   refuses to write a file whose pages do not rebuild exactly, and a test opens it in headless Edge (where installed)
   to check the browser draws what Python unpacks.
-- **Keep one export.** Each run writes a new timestamped file; delete the old one so the wrong snapshot is not the one
-  attached.
+- **One export at a time.** Once the new file is written, every earlier export in the same folder is deleted, so an
+  old snapshot cannot be the one attached to an email. Only files named like an export (`danbro_<date>_<time>.html`)
+  are touched. `--keep` keeps them.
 - It is **read-only**: SAP standards and pieces per cycle are shown as text, as they were at export time, and the CSV
   tools are absent.
 - It always uses the fleet window; per-line widening and the line page's product filter are live-app features.
@@ -251,7 +305,7 @@ no server and fetches nothing: open it in Edge, Chrome or Firefox, or attach it 
 
 ## Tests
 
-`python -m pytest` — 290 tests, about seven minutes (most of it the export tests), no device. Fixtures in `tests/fixtures/devices/` (16 MB) are a
+`python -m pytest` — 344 tests, four to seven minutes (most of it the export tests), no device. Fixtures in `tests/fixtures/devices/` (16 MB) are a
 recorded first-run backfill of all four devices; the end-to-end tests replay them through the real sync into a fresh
 cache.
 
@@ -277,11 +331,13 @@ in that code would be compared with itself and pass.
 | `test_charts.py` | Heatmap painting (latest-started event owns the time), 24 h coverage, the AreaB idle stretch, quadrant zones and config thresholds, labels that never overlap. |
 | `test_charts_more.py` | The implausible rule (42 events, the 24 h cap, config), charts leaving them out and tables keeping them, Pareto on one axis, rhythm weeks, changeovers charged once. |
 | `test_rhythm_pareto.py` | The rhythm change point (AreaB 11 May, −60%, t 6.5; not the other lines), the Pareto verdict, the availability-convention note. |
+| `test_sticky.py` | The bar directly under the nav on every page (the live status line on /live), the rules, and in headless Edge at 1280 and 390 px: band under 90 px, nav at 0 with the bar exactly under it, only the nav on a phone, the shadow only once floating, the hour-table jump landing below the band. The export's band is checked in `test_export.py`. |
+| `test_live.py` | Each device's recorded reading, no counts, a failed read keeping the last values, a slow device not delaying the rest, one writer, the page reading only the table, never-run, stale by age and by failure, never-read panels, the JSON endpoint, counted vs wall-clock time; and in headless Edge: a reading turning stale as it ages, a failed poll keeping values with ages climbing, an in-place update with no reload, polling paused while hidden and resumed at once. |
 | `test_product_pages.py` | Runs and their stops against part_run, ICT levels and outliers, the reconfigurations on the recording, every product-page section with literal figures, part links, the line page's product filter. |
 
 ### Mutation check
 
-`python tests/mutation_check.py` applies, one at a time, 64 deliberate bugs of the kind a refactor or a "helpful" fix
+`python tests/mutation_check.py` applies, one at a time, 91 deliberate bugs of the kind a refactor or a "helpful" fix
 could introduce — clamping a count, inverting a ratio, taking a mean for a median, starting weeks on Sunday — runs
 the suite against each, and restores the original. A bug the suite does not notice is a gap. It takes several minutes;
 `--list` shows the bugs, and numbers run a subset.
@@ -307,6 +363,15 @@ that cannot load fails every test for the wrong reason). Any failure refuses the
 an ordinary test (`test_mutation_pins.py`), so a stale mutation fails `pytest` itself. `--check` runs only the check;
 `--pins` prints each mismatched entry with its current line and new pin. When you change a pinned line on purpose,
 re-read the mutation against the new code before taking the new pin: updating it blindly defeats the point.
+
+**One run at a time, and nothing edited while it runs.** A run holds `.mutation_run.lock` (created exclusively; a
+second run refuses to start, exit 2) and keeps the original bytes of the file it has mutated in
+`.mutation_run.original`. It hashes every source file before the first mutation and checks them before and after each
+one. An edit saved mid-run would otherwise be wiped by the restore, or keep the mutation, or change what later
+mutations test; so on any change the run stops with no verdict (exit 3), restores the original, and keeps the edited
+file as `<file>.edited-during-mutation`. A lock left behind means a run was killed: `--check` shows whether a file was
+left mutated, `.mutation_run.original` holds its original bytes, then delete the lock. The runner's own guards are
+among the 70 mutations.
 
 **Re-recording** (`refresh --record tests/fixtures/devices` against an *empty* cache) changes the data under the
 literal expectations. Re-derive them from the raw JSON, independently, before updating them.

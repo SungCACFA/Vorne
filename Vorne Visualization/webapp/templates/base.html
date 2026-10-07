@@ -10,10 +10,13 @@
   <a href="{{ url_for('overview') }}{{ win.query() }}"{% if page == 'overview' %} aria-current=page{% endif %}>Overview</a>
   {% for d in snap.devices %}<a href="{{ url_for('line', dev=d) }}{{ win.query() }}"{% if page == d %} aria-current=page{% endif %}>{{ d }}</a>{% endfor %}
   <a href="{{ url_for('products') }}{{ win.query() }}"{% if page == 'products' %} aria-current=page{% endif %}>Products</a>
+  <a href="{{ url_for('live_view') }}"{% if page == 'live' %} aria-current=page{% endif %}>Live</a>
 </nav>
+{% block bar %}{% include "_controls.html" %}{% endblock %}
+{% if page != 'live' %}
 <!--head-->{% include "_alerts.html" %}<!--/head-->
-{% include "_controls.html" %}
 <!--panel-->{% include "_exclusion.html" %}<!--/panel-->
+{% endif %}
 <!--body-->{% block body %}{% endblock %}<!--/body-->
 <script>
 document.addEventListener('click', ev => {
@@ -33,4 +36,5 @@ document.addEventListener('click', ev => {
 </script>
 <footer><!--foot-->{% block footer %}{% endblock %}<!--/foot--></footer>
 </div>
+{% include "_sticky.html" %}
 </html>

@@ -4,6 +4,7 @@
     python -m xlpipe refresh --device FR8 --channel shift_hour
     python -m xlpipe refresh --record fixtures/    also save raw responses
     python -m xlpipe report                        what the cache holds
+    python -m xlpipe live [--interval S]           the live writer, in the foreground
 
 refresh is single-instance: a second concurrent run exits immediately
 rather than starting a second backfill.
@@ -108,6 +109,28 @@ def cmd_refresh(args, cfg) -> int:
     return 1 if failed else 0
 
 
+def live_lock(cfg: dict) -> RunLock:
+    """One live writer at a time, whether standalone or inside the app."""
+    return RunLock(Path(cfg.get("cache_path", "cache/xl_cache.db")).with_suffix(".live.lock"))
+
+
+def cmd_live(args, cfg) -> int:
+    from . import live
+
+    interval, timeout = live.settings(cfg)
+    interval = args.interval or interval
+    with live_lock(cfg):
+        stop, threads = live.start(Path(cfg.get("cache_path", "cache/xl_cache.db")), cfg["devices"],
+                                   interval=interval, timeout=timeout)
+        logging.info("live writer: %d devices every %.0f s; Ctrl+C to stop", len(threads), interval)
+        try:
+            while any(t.is_alive() for t in threads):
+                stop.wait(1.0)
+        except KeyboardInterrupt:
+            stop.set()
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m xlpipe")
     ap.add_argument("--config", default="config.yaml")
@@ -118,6 +141,8 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--channel", action="append", choices=sorted(SPECS), help="repeatable")
     r.add_argument("--record", metavar="DIR", help="also save every raw response (test fixtures)")
     sub.add_parser("report", help="summarise what the cache holds")
+    lv = sub.add_parser("live", help="poll every device's real-time data into current_state")
+    lv.add_argument("--interval", type=float, help="seconds between reads of each device")
     args = ap.parse_args(argv)
 
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
@@ -128,6 +153,12 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_refresh(args, cfg)
         except AlreadyRunning as exc:
             print(exc)
+            return 3
+    if args.cmd == "live":
+        try:
+            return cmd_live(args, cfg)
+        except AlreadyRunning as exc:
+            print(f"a live writer is already running ({exc})")
             return 3
     from .report import report
     return report(cfg)

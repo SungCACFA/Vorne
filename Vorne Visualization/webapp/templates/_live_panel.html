@@ -1,0 +1,40 @@
+{% from "_live_macros.html" import hm, h1, clock, since, ago with context %}
+{%- set imp = impact_colour.get(r.performance_impact, 'nsc') -%}
+<section class="lpanel{{ ' stale' if r.stale }}{{ ' never' if r.never_read }}" data-panel data-device="{{ r.device_id }}"
+  data-age0="{{ '%.1f'|format(r.age_s) if r.age_s is not none else '' }}" data-failing="{{ 1 if r.failing else 0 }}"
+  data-stale-after="{{ stale_after }}">
+  <h2>{{ r.device_id }}</h2>
+  {% if r.never_read %}
+  <p class=lfail><strong>No reading yet from {{ r.device_id }}.</strong>
+  {% if r.last_error %}Every attempt has failed; the last, at {{ clock(r.attempted) }}: {{ r.last_error }}{% else %}The
+  writer has not reached it yet.{% endif %}</p>
+  {% else %}
+  <p class=lstalebar data-stalebar>{% if r.failing %}<strong>Read failed at {{ clock(r.attempted) }}</strong>
+  ({{ r.last_error }}). {% endif %}<strong>Stale:</strong> these are the last good values, read at
+  {{ clock(r.observed) }}, <span data-age>{{ r.age_s|int }} s</span> ago.</p>
+  <div class=lvals>
+    <p class="lstate imp-{{ imp }}" title="{{ impact_name.get(r.performance_impact, r.performance_impact or '') }}">{{ r.process_state_label or (r.process_state or '—')|replace('_', ' ') }}</p>
+    {% if r.process_state_reason_display_name and r.process_state_reason_display_name != r.process_state_label %}
+    <p class=lreason>{{ r.process_state_reason_display_name }}</p>{% endif %}
+    {#- The device counts time in a state without the breaks and unscheduled time inside it. When the
+        wall clock since the state began is well past that, show both, so it does not read as a bug. -#}
+    {%- set wall = (r.observed - r.state_start_ts).total_seconds() if r.state_start_ts and r.observed else none -%}
+    {%- set gap = wall is not none and r.state_elapsed_s is not none and wall - r.state_elapsed_s > 600 %}
+    <p class=lin title="Time in this state as the device records it, at the reading: breaks and unscheduled time inside it are left out.">
+      {%- if gap %}<strong>{{ hm(r.state_elapsed_s) }}</strong> counted · since {{ since(r.state_start_ts) }} ({{ ago(wall) }})
+      {%- else %}<strong>{{ hm(r.state_elapsed_s) }}</strong> in this state{% if r.state_start_ts %} · since {{ since(r.state_start_ts) }}{% endif %}{% endif %}</p>
+    <dl class=lfacts>
+      <dt>Part</dt><dd>{% if r.part in known_parts %}<a class=lnk href="{{ url_for('product', part=r.part) }}">{{ r.part_label or r.part }}</a>{% else %}{{ r.part_label or r.part or '—' }}{% endif %}
+        {% if r.job %}<span class=muted> · job {{ r.job }}</span>{% endif %}</dd>
+      <dt>Shift</dt><dd>{{ r.shift_label or (r.shift or '—')|replace('_', ' ') }}
+        {%- if r.shift_elapsed_s is not none %}, <strong>{{ hm(r.shift_elapsed_s) }}</strong> in{% endif %}
+        {%- if r.shift_start_ts %} <span class=muted>(since {{ since(r.shift_start_ts) }})</span>{% endif %}</dd>
+      <dt>This shift</dt><dd>Run <strong>{{ h1(r.shift_run_time) }} h</strong> · Down <strong>{{ h1(r.shift_unplanned_stop_time) }} h</strong>
+        · Planned <strong>{{ h1(r.shift_planned_stop_time) }} h</strong></dd>
+      <dt>Available</dt><dd><strong>{{ r.availability|pc }}</strong> <span class=muted>· Performance</span>
+        <strong>{{ r.performance|pc }}</strong></dd>
+    </dl>
+  </div>
+  <p class=lread>Read at <strong>{{ clock(r.observed) }}</strong> · <span data-age>{{ r.age_s|int }} s</span> ago</p>
+  {% endif %}
+</section>

@@ -217,6 +217,11 @@ CREATE TABLE IF NOT EXISTS current_state (
     shift_label            text,
     process_state_event_id bigint,
     shift_event_id         bigint,
+    device_time            timestamptz,        -- the device's own clock at the reading
+    state_start            timestamptz,        -- when the present process state began
+    state_elapsed_s        double precision,   -- time in it, interruptions excluded (device's own)
+    shift_start            timestamptz,
+    shift_elapsed_s        double precision,
     -- Current shift so far (shift channel). Counts are shown only where the
     -- current epoch is counts_trusted.
     shift_run_time            double precision,

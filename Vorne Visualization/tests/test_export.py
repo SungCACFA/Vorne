@@ -19,7 +19,9 @@ def export(replayed_cache, tmp_path_factory):
     d = tmp_path_factory.mktemp("export")
     cfg = d / "config.yaml"
     cfg.write_text(f"cache_path: {replayed_cache.as_posix()}\n", encoding="utf-8")
-    out = build(cfg, d / "snapshot.html", log=lambda *_: None)
+    earlier = d / "danbro_2026-01-01_0000.html"       # an older snapshot in the same folder
+    earlier.write_text("old", encoding="utf-8")
+    out = build(cfg, d / "danbro_2026-10-07_0000.html", log=lambda *_: None)
     html = out.read_text(encoding="utf-8")
     packed = re.search(r'const PACKED = "([^"]+)"', html).group(1)
     bundle = json.loads(gzip.decompress(base64.b64decode(packed)))
@@ -28,6 +30,7 @@ def export(replayed_cache, tmp_path_factory):
     from webapp.export import unpack
     bundle["strings"] = [unpack(bundle["chunks"], s) for s in bundle["seqs"]]
     bundle["_path"] = out
+    bundle["_earlier_left"] = earlier.exists()
     return html, bundle
 
 
@@ -153,3 +156,20 @@ def test_the_browser_rebuilds_pages_as_python_does(export, tmp_path):
         for tag in ("<tr", "<rect", "<circle", "<text", "<h2"):
             assert main.count(tag) == src.count(tag), (page, tag)
         assert main.count("<rect") > 50                   # a real page, not an empty one
+
+
+def test_the_build_deleted_the_earlier_export(export):
+    """The fixture put an earlier export beside the new one; build() removed it."""
+    _, b = export
+    assert b["_earlier_left"] is False
+    assert b["_path"].exists()
+
+
+def test_the_export_has_the_same_sticky_band(export, tmp_path):
+    """Opened at a line page, the snapshot's nav and period bar stick together under 90 px, as in the app."""
+    from test_sticky import measure
+
+    html, _ = export
+    assert html.count("// The sticky band") == 1
+    m = measure(html.replace("location.hash.slice(1)", "'AreaB/month/2026-09'"), 1280, tmp_path)
+    assert m["navTop"] == 0 and abs(m["barTop"] - m["navH"]) < 1 and m["band"] < 90 and m["scrolled"] is True
