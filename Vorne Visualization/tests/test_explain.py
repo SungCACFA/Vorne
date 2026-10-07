@@ -172,3 +172,94 @@ def test_tooltips_and_definitions_in_a_browser(app_client, tmp_path):
     assert o == {"hover": True, "nativeTitleGone": True, "flips": True, "hidesOffChart": True, "tapShows": True,
                  "secondTapHides": True, "opens": True, "focusMoves": True, "escapeCloses": True,
                  "clickOutsideCloses": True}
+
+
+# ------------------------------------------------------------ highlighting
+
+def test_each_reason_links_its_bubble_bar_and_row(app_client):
+    h = app_client.get("/line/AreaB?g=ytd&p=2026").get_data(as_text=True)
+    quad = h[h.index("<svg class=quad"):h.index("</svg>", h.index("<svg class=quad"))]
+    par = h[h.index("<svg class=pareto"):h.index("</svg>", h.index("<svg class=pareto"))]
+    why = h[h.index("<h2>Why it stopped"):h.index("<h2>Planned stops")]
+    assert '<g class=bubble data-hl="unp:Bottle Jam">' in quad
+    assert '<g class=pbar data-hl="unp:Bottle Jam">' in par
+    assert '<tr data-hl="unp:Bottle Jam"><th>Bottle Jam</th>' in why
+    planned = h[h.index("<h2>Planned stops"):]
+    assert "data-hl=\"unp:" not in planned[:planned.index("</table>")]      # planned reasons stay out of it
+    assert 'All other' in par and not re.search(r'<g class=pbar data-hl="unp:All other', par)
+
+
+def test_every_hour_row_points_at_the_cell_that_draws_its_hour(app_client):
+    """Cells carry no key; a row's key names the heatmap row (window) and cell. Check each against the
+    window boundaries the heatmap itself is drawn from."""
+    from datetime import date
+
+    from webapp import data as D
+
+    h = app_client.get("/line/AreaB?g=month&p=2026-09").get_data(as_text=True)
+    windows = set(re.findall(r'data-filter-day="([\d-]+)" class=heatrow>', h))
+    rows = re.findall(r'<tr data-day="[\d-]+" data-hl="h:([\d-]+)/(\d+)"[^>]*>.*?<td>(\d\d):\d\d–', h, re.S)
+    assert rows and len(rows) == h.count("<tr data-day=")                # every row in the table checked
+    for window, i, hour in rows:
+        assert window in windows
+        bounds = D.production_day_window((date.fromisoformat(window) - D.EPOCH).days)[1]
+        assert bounds[int(i)].hour == int(hour), (window, i, hour)       # that cell starts at the row's hour
+    assert '<rect' in h and not re.search(r'<rect [^>]*data-hl=', h)    # nothing on the cells themselves
+    # ...and each key, worked out another way: the window and cell of (start + 1 h) on the local clock
+    # (a 23:00 hour belongs to the next day's row, at cell 0)
+    from datetime import timedelta
+
+    recs = D.hours(app_client.application.config["CACHE_PATH"], "AreaB", 20697, 20726)   # 1-30 Sep 2026
+    expected = []
+    for r in recs:
+        t = r["start"].astimezone(D.TZ) + timedelta(hours=1)
+        expected.append(f"h:{t.date().isoformat()}/{t.hour}")
+    got = re.findall(r'<tr data-day="[\d-]+" data-hl="(h:[^"]+)"', h)
+    assert got == expected
+    assert any(k.endswith("/0") for k in got)                          # a 23:00 hour is among them
+
+
+def test_overview_rows_link_their_sparkline(app_client):
+    h = app_client.get("/?g=month&p=2026-09").get_data(as_text=True)
+    for dev in ("AreaB", "AreaD", "AreaE", "FR8"):
+        assert f'<tr data-hl="line:{dev}">' in h and f'<div class=strip data-hl="line:{dev}">' in h
+
+
+HL_PROBE = r"""<script>
+function over(el) { el.dispatchEvent(new PointerEvent('pointerover', {bubbles: true, pointerType: 'mouse'})); }
+const lit = sel => [...document.querySelectorAll(sel)].map(e => e.classList.contains('hl'));
+addEventListener('load', () => setTimeout(() => {
+  const o = {};
+  over(document.querySelector('tr[data-hl="unp:Bottle Jam"] th'));
+  o.fromRow = lit('[data-hl="unp:Bottle Jam"]');
+  o.othersDark = document.querySelectorAll('.hl').length;
+  over(document.querySelector('g.bubble[data-hl="unp:Bottle Jam"] circle'));
+  o.fromBubble = lit('[data-hl="unp:Bottle Jam"]');
+  const row = document.querySelector('tr[data-hl^="h:"]');
+  over(row.querySelector('td'));
+  const [, day, idx] = /^h:([\d-]+)\/(\d+)$/.exec(row.dataset.hl);
+  const cell = document.querySelectorAll(`a.heatrow[data-filter-day="${day}"] rect`)[+idx];
+  o.hourCell = [cell.classList.contains('hl')];
+  over(document.querySelector('h1'));
+  over(cell);                                    // and the other way: the cell lights its rows
+  o.cellLightsRow = row.classList.contains('hl') && cell.classList.contains('hl');
+  over(document.querySelector('h1'));
+  o.cleared = document.querySelectorAll('.hl').length;
+  document.body.dataset.probe = JSON.stringify(o);
+}, 300));
+</script>"""
+
+
+def test_pointing_at_either_side_lights_the_other(app_client, tmp_path):
+    if not EDGE.exists() and not shutil.which("msedge"):
+        pytest.skip("no Edge on this machine to run the page's scripts")
+    html = app_client.get("/line/AreaB?g=ytd&p=2026").get_data(as_text=True)
+    html = html.replace('<link rel=stylesheet href="/static/style.css">', f"<style>{CSS}</style>")
+    f = tmp_path / "hl.html"
+    f.write_text(re.sub(r'<link href="https://fonts[^>]+>', "", html) + HL_PROBE, encoding="utf-8")
+    dom = subprocess.run([str(EDGE), "--headless=new", "--disable-gpu", f"--user-data-dir={tmp_path / 'edge'}",
+                          "--window-size=1280,900", "--virtual-time-budget=6000", "--dump-dom", f.as_uri()],
+                         capture_output=True, text=True, encoding="utf-8", timeout=180).stdout
+    o = json.loads(unescape(re.search(r'data-probe="([^"]+)"', dom).group(1)))
+    assert o == {"fromRow": [True, True, True], "othersDark": 3, "fromBubble": [True, True, True],
+                 "hourCell": [True], "cellLightsRow": True, "cleared": 0}

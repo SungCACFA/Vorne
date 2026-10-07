@@ -66,7 +66,7 @@ def test_no_minus_zero_anywhere_on_the_july_line_page(app_client):
 
 def test_changeover_hour_is_marked(app_client):
     html = app_client.get("/line/FR8?g=day&p=2026-07-03").get_data(as_text=True)
-    rows = re.findall(r'<tr data-day="2026-07-03" class="changeover">.*?</tr>', html, re.S)
+    rows = re.findall(r'<tr data-day="2026-07-03" data-hl="[^"]+" class="changeover">.*?</tr>', html, re.S)
     assert len(rows) == 1
     # each part named links to its product page, in the device's order
     assert ('<a class=lnk href="/product/PREMARINi_30G?g=day&amp;p=2026-07-03">PREMARINi_30G</a><span class=sep> / '
@@ -81,5 +81,5 @@ def test_line_page_down_events_and_top_reason(app_client):
     glance = html[html.index("at a glance"):html.index("<h2>Hours by activity")]
     assert re.findall(r"<td>([^<]*)</td>", glance)[-2:] == ["91.5", "240"]
     why = html[html.index("<h2>Why it stopped"):html.index("<h2>Planned stops")]
-    first = re.search(r"<tbody>\s*<tr><th>([^<]+)</th>.*?<td>([\d.,]+)</td><td>([\d,]+)</td>", why, re.S).groups()
+    first = re.search(r'<tbody>\s*<tr(?: data-hl="[^"]*")?><th>([^<]+)</th>.*?<td>([\d.,]+)</td><td>([\d,]+)</td>', why, re.S).groups()
     assert first == ("Waiting Components!", "18.7", "2")

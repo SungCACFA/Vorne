@@ -30,7 +30,7 @@
 {%- endmacro %}
 
 {% macro spark(dev, days) -%}
-<div class=strip><h3>{{ dev }}</h3>
+<div class=strip data-hl="line:{{ dev }}"><h3>{{ dev }}</h3>
 <div class=spark role=img aria-label="{{ dev }} daily availability, {{ days|length }} production days">
 {%- for day, a in days -%}
 <i title="Production day {{ day|pday }}&#10;{{ ('Available ' ~ a|pc) if a is not none else 'Nothing scheduled' }}" style="height:{{ '%.1f'|format([(a or 0) * 100, 1.5]|max) }}%"></i>

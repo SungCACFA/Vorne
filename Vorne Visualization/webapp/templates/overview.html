@@ -14,7 +14,7 @@ That reconciliation is what makes the rates below dependable.</p>
 <thead><tr><th>Line</th><td class=bar>Share of elapsed time</td>{{ rate_heads() }}<td>{{ term('scheduled', 'Scheduled h') }}</td><td>{{ term('down', 'Down h') }}</td></tr></thead>
 <tbody>
 {% for dev, t in rows %}
-<tr><th><a class=lnk href="{{ url_for('line', dev=dev) }}{{ win.query() }}">{{ dev }}</a></th><td class=bar>{{ stack(t) }}</td>
+<tr data-hl="line:{{ dev }}"><th><a class=lnk href="{{ url_for('line', dev=dev) }}{{ win.query() }}">{{ dev }}</a></th><td class=bar>{{ stack(t) }}</td>
 <td>{{ t.availability|pc }}</td><td>{{ perf(t.performance) }}</td><td>{{ t.utilization|pc }}</td>
 <td>{{ t.sched|hrs }}</td><td>{{ t.unp|hrs }}</td></tr>
 {% endfor %}

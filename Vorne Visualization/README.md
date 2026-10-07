@@ -49,7 +49,7 @@ when there are, they go in `.env`, which is git-ignored.
 | `python -m webapp [--port N]` | The app. Reads the cache on every request, so a refresh shows on the next page load. Also runs the live writer for `/live` (`--no-live-writer` to leave it to a separate process). |
 | `python -m xlpipe live [--interval S]` | The live writer on its own: every device's real-time data into `current_state`, every 5 s. One writer at a time. |
 | `python -m webapp export [--out FILE] [--keep]` | A self-contained, read-only HTML snapshot of every page, product page and period (≈3 min, ≈2.6 MB). Deletes earlier exports in the same folder unless `--keep`. See below. |
-| `python -m pytest` | 360 tests, no device needed (≈4–7 min, most of it the export tests). |
+| `python -m pytest` | 364 tests, no device needed (≈4–7 min, most of it the export tests). |
 | `python tests/mutation_check.py` | Would the tests notice if the code were wrong? See Tests. |
 | `python preflight.py` | When there is a database path: DNS, TCP 5432, TLS, auth, permissions, latency, as separate steps. |
 
@@ -246,6 +246,16 @@ one-line definition, the formula, what it answers and one caution. The wording l
 templates write `term('available')`. Each page's footer lists the definitions it used, so without scripts a measure
 name is a link to its definition, and with scripts the panel takes its text from that list.
 
+**Highlighting.** Where a chart and a table show the same thing, pointing at either highlights both: an
+unplanned-stop reason links its quadrant bubble, its Pareto bar and its row in "Why it stopped"; a heatmap hour
+links its row in the hour table; on the overview, a line's row links its availability strip. They share a `data-hl`
+key built by one helper per kind (`data.reason_key`, `data.hour_key`), so the two sides cannot disagree. Heatmap
+cells carry no key themselves: an hour row's key names the cell that draws its hour (`h:<window>/<cell>`, a 23:00
+hour belonging to the next day's row), and the page reads a cell's key from its position. A key on every cell of
+every view cost the export 0.24 MB. Planned-stop
+rows are not keyed, so a planned reason never lights the unplanned charts. Pointer only (hover, or a tap on touch);
+without scripts nothing changes.
+
 **The wording is provisional.** It was to come from the measures guide (PDF), which was not on this machine; until
 it is supplied, `glossary.py` uses the wording already on the site, and each page says so under its definitions.
 Replacing it changes that one file.
@@ -328,7 +338,7 @@ no server and fetches nothing: open it in Edge, Chrome or Firefox, or attach it 
 
 ## Tests
 
-`python -m pytest` — 360 tests, four to seven minutes (most of it the export tests), no device. Fixtures in `tests/fixtures/devices/` (16 MB) are a
+`python -m pytest` — 364 tests, four to seven minutes (most of it the export tests), no device. Fixtures in `tests/fixtures/devices/` (16 MB) are a
 recorded first-run backfill of all four devices; the end-to-end tests replay them through the real sync into a fresh
 cache.
 
@@ -361,7 +371,7 @@ in that code would be compared with itself and pass.
 
 ### Mutation check
 
-`python tests/mutation_check.py` applies, one at a time, 103 deliberate bugs of the kind a refactor or a "helpful" fix
+`python tests/mutation_check.py` applies, one at a time, 110 deliberate bugs of the kind a refactor or a "helpful" fix
 could introduce — clamping a count, inverting a ratio, taking a mean for a median, starting weeks on Sunday — runs
 the suite against each, and restores the original. A bug the suite does not notice is a gap. It takes several minutes;
 `--list` shows the bugs, and numbers run a subset.

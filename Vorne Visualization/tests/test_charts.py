@@ -135,7 +135,7 @@ def test_every_reason_is_a_bubble_with_a_tooltip(app_client):
     quad = html[html.index('<svg class=quad'):html.index('</svg>', html.index('<svg class=quad'))]
     why = html[html.index("<h2>Why it stopped"):html.index("<h2>Planned stops")]
     body = why[why.index("<tbody>"):]                       # not the header row
-    n_reasons = len(re.findall(r"<tr><th>[^<]+</th><td class=bar>", body))
+    n_reasons = len(re.findall(r'<tr(?: data-hl="[^"]*")?><th>[^<]+</th><td class=bar>', body))
     more = re.search(r"(\d+) more reasons?</th>", why)
     total = n_reasons + (int(more.group(1)) if more else 0)
     assert quad.count("class=bubble") == total

@@ -212,7 +212,8 @@ def quadrant(reasons: list[dict], n_days: int, label_top: int = 7, *,
         name, action = zone_of(r["events"], r["mean_s"], split_e, split_m)
         title = (f"{r['reason']} · {_h(r['seconds'])} h lost · {r['events']:,} stops · "
                  f"{_m(r['mean_s'])} min each · {name}\n{action[0].upper() + action[1:]}")
-        o.append(f'<g class=bubble><circle cx="{cx:.1f}" cy="{cy:.1f}" r="{rr:.1f}" class=dot />'
+        o.append(f'<g class=bubble data-hl="{escape(D.reason_key(r["reason"]))}">'
+                 f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{rr:.1f}" class=dot />'
                  f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{max(rr, 12):.1f}" class=hit>'
                  f'<title>{escape(title)}</title></circle></g>')
     # Direct labels for the biggest reasons, placed only where they collide
@@ -312,7 +313,8 @@ def pareto(reasons: list[dict], top: int = 15) -> Markup:
     for i, ((name, s, n), c) in enumerate(zip(rows, cums)):
         y = T + i * row_h
         other = name.startswith("All other ")
-        o.append(f'<g class=pbar><text x="{label_w - 8}" y="{y + 15}" class="end {"tick" if other else "lab"}">'
+        hl = "" if other else f' data-hl="{escape(D.reason_key(name))}"'
+        o.append(f'<g class=pbar{hl}><text x="{label_w - 8}" y="{y + 15}" class="end {"tick" if other else "lab"}">'
                  f'{escape(name)}</text>'
                  f'<rect x="{label_w}" y="{y + 5}" width="{max(1.0, pw * s / total):.1f}" height="{row_h - 9}" '
                  f'rx="2" class="{"bar other" if other else "bar"}" />'

@@ -454,6 +454,22 @@ def save_standard(cache_path, part: str, *, sap: float | None = ..., unit: str |
 IMPACTS = ("run", "unplanned_stop", "planned_stop", "not_scheduled")
 
 
+def hour_key(ts: datetime) -> str:
+    """The highlight key of an hour-table row: the heatmap cell that draws the same local clock hour,
+    as "h:<window>/<cell>". Heatmap rows are the windows from 23:00 the evening before (see
+    production_day_window), so 23:00 belongs to the next day's row, at cell 0. Cells carry no key of
+    their own - the page reads it from their position (row's day, cell index), which keeps the export
+    small (a key on every cell of every view cost 0.24 MB)."""
+    t = ts.astimezone(TZ)
+    window = t.date() + timedelta(days=1) if t.hour == 23 else t.date()
+    return f"h:{window.isoformat()}/{(t.hour + 1) % 24}"
+
+
+def reason_key(reason: str) -> str:
+    """The highlight key linking an unplanned-stop reason across the quadrant, the Pareto and the table."""
+    return "unp:" + reason
+
+
 def production_day_window(n: int) -> tuple[datetime, list[datetime]]:
     """Production day n as drawn on the heatmap: the nominal window from
     23:00 the evening before to 23:00, split at each local clock hour.

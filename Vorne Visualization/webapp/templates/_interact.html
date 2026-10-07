@@ -66,6 +66,34 @@
     if (link) link.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); }, {once: true, capture: true});
   });
 
+  // Highlighting: a chart element and the table row showing the same thing share a data-hl key (a stop
+  // reason; a heatmap hour; a line on the overview). Pointing at either highlights every element with it.
+  // Heatmap cells carry no key: a cell's key is its row's day and its index in the row ("h:<day>/<i>"),
+  // the same key data.hour_key gives the hour-table rows.
+  function cellOf(key) {
+    const m = /^h:([\d-]+)\/(\d+)$/.exec(key);
+    const row = m && document.querySelector(`a.heatrow[data-filter-day="${m[1]}"]`);
+    return row ? row.querySelectorAll('rect')[+m[2]] : null;
+  }
+  function keyOf(target) {
+    if (!(target instanceof Element)) return null;
+    const el = target.closest('[data-hl]');
+    if (el) return el.dataset.hl;
+    const cell = target.closest('a.heatrow rect'), row = cell && cell.closest('a.heatrow');
+    return row ? `h:${row.dataset.filterDay}/${[...row.querySelectorAll('rect')].indexOf(cell)}` : null;
+  }
+  let hlKey = null;
+  function highlight(key) {
+    if (key === hlKey) return;
+    const all = k => { const c = cellOf(k), es = [...document.querySelectorAll(`[data-hl="${CSS.escape(k)}"]`)];
+                       return c ? es.concat(c) : es; };
+    if (hlKey) for (const e of all(hlKey)) e.classList.remove('hl');
+    hlKey = key;
+    if (key) for (const e of all(key)) e.classList.add('hl');
+  }
+  document.addEventListener('pointerover', ev => highlight(keyOf(ev.target)), {passive: true});
+  document.addEventListener('pointerout', ev => { if (!ev.relatedTarget) highlight(null); }, {passive: true});
+
   // Definitions: the text is the page's own Definitions list (rendered from webapp/glossary.py).
   let opener = null;
   function openDef(a) {

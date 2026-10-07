@@ -243,3 +243,12 @@ color:var(--mute);cursor:pointer;padding:2px 6px}
 .glossary .def:target{outline:2px solid var(--ink);outline-offset:6px}
 .defsrc{font-size:12px}
 @media print{.tip,.defpop{display:none}}
+/* ---- highlighting: a table row and its chart element, pointed at together (_interact.html) */
+tr.hl > th,tr.hl > td{background:#E9EDEE}
+svg .bubble.hl .dot{fill-opacity:.9;stroke:var(--ink);stroke-width:2.5}
+svg .pbar.hl .bar{stroke:var(--ink);stroke-width:2}
+svg .pbar.hl text.lab{font-weight:600}
+svg rect.hl{stroke:var(--ink);stroke-width:2.5}
+.strip.hl .spark{outline:2px solid var(--ink);outline-offset:1px}
+.strip.hl h3{text-decoration:underline;text-underline-offset:3px}
+@media print{tr.hl > th,tr.hl > td{background:none}}

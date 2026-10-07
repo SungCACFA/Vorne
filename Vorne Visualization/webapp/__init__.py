@@ -231,6 +231,8 @@ def create_app(config_path: str | Path = ROOT / "config.yaml") -> Flask:
         return [(k, GL.DEFS[k]) for k in g.get("terms_used", [])]
 
     app.jinja_env.globals.update(term=term, terms_used=terms_used, glossary_source=GL.SOURCE)
+    # highlight keys: the same helpers the charts use, so a row and its chart element always match
+    app.jinja_env.filters.update(hourkey=D.hour_key, reasonkey=D.reason_key)
 
     @app.context_processor
     def nav():

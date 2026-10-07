@@ -305,6 +305,21 @@ MUTATIONS: list[tuple[str, str, str, str]] = [
     ("runner: an edit during the baseline run goes unnoticed", "tests/mutation_check.py",
      "    if edited := changed_since(" "before):\n        raise EditedDuringRun(f\"source changed during the baseline",
      "    if edited := []:\n        raise EditedDuringRun(f\"source changed during the baseline"),
+    # --- highlighting
+    ("highlight: nothing lights up", "webapp/templates/_interact.html",
+     "    if (key) for (const e of all(key)) e.classList.add('hl');", "    ;"),
+    ("highlight: the last highlight never clears", "webapp/templates/_interact.html",
+     "    if (hlKey) for (const e of all(hlKey)) e.classList.remove('hl');", "    ;"),
+    ("highlight: reason rows keyed by the bare name, so they match no chart", "webapp/templates/line.html",
+     'data-hl="{{ r.reason|reasonkey }}"', 'data-hl="{{ r.reason }}"'),
+    ("highlight: an hour row keyed on UTC, not the local clock the heatmap draws", "webapp/data.py",
+     "    t = ts.astimezone(TZ)\n    window = t.date()", "    t = ts\n    window = t.date()"),
+    ("highlight: a 23:00 hour keyed to its own date's row, not the next day's", "webapp/data.py",
+     "    window = t.date() + timedelta(days=1) if t.hour == 23 else t.date()", "    window = t.date()"),
+    ("highlight: a heatmap cell reads its key one cell off", "webapp/templates/_interact.html",
+     "[...row.querySelectorAll('rect')].indexOf(cell)}", "[...row.querySelectorAll('rect')].indexOf(cell) + 1}"),
+    ("highlight: planned-stop rows light up the unplanned charts", "webapp/templates/line.html",
+     "{% macro reason_table(rows, colour, title, lead, hl=false) -%}", "{% macro reason_table(rows, colour, title, lead, hl=true) -%}"),
 ]
 
 
@@ -629,6 +644,13 @@ PINS: dict[str, str] = {
     'rhythm tooltip: change from the previous week inverted': '78d39adefd2c',
     "quadrant tooltip: the zone's implication dropped": '851c37b6eeeb',
     'runner: an edit during the baseline run goes unnoticed': '2cb6dcba30ce',
+    'highlight: nothing lights up': 'a038c5f9e758',
+    'highlight: the last highlight never clears': '343960a60bc1',
+    'highlight: reason rows keyed by the bare name, so they match no chart': '9b17207d32a4',
+    'highlight: planned-stop rows light up the unplanned charts': 'cde8904651b7',
+    'highlight: an hour row keyed on UTC, not the local clock the heatmap draws': 'a737e5a1ddc1',
+    "highlight: a 23:00 hour keyed to its own date's row, not the next day's": 'be301a0f0651',
+    'highlight: a heatmap cell reads its key one cell off': 'a48e6d5f0b2d',
 }
 
 

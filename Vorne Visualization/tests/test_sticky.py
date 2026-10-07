@@ -49,11 +49,18 @@ def measure(html: str, width: int, tmp_path: Path) -> dict:
     html = re.sub(r'<link href="https://fonts[^>]+>', "", html) + PROBE
     f = tmp_path / f"page{width}.html"
     f.write_text(html, encoding="utf-8")
-    dom = subprocess.run([str(EDGE), "--headless=new", "--disable-gpu", "--hide-scrollbars",
-                          f"--user-data-dir={tmp_path / 'edge'}", f"--window-size={width},900",
-                          "--virtual-time-budget=5000", "--dump-dom", f.as_uri()],
-                         capture_output=True, text=True, encoding="utf-8", timeout=120).stdout
-    return json.loads(re.search(r'data-band="([^"]+)"', dom).group(1).replace("&quot;", '"'))
+    # Under heavy load headless Edge can hand back the page before the probe has run (once, in a suite
+    # run 60% slower than usual). That - no measurement at all - is retried once with more time; a
+    # measurement that is wrong is never retried.
+    for budget in (5000, 15000):
+        dom = subprocess.run([str(EDGE), "--headless=new", "--disable-gpu", "--hide-scrollbars",
+                              f"--user-data-dir={tmp_path / 'edge'}", f"--window-size={width},900",
+                              f"--virtual-time-budget={budget}", "--dump-dom", f.as_uri()],
+                             capture_output=True, text=True, encoding="utf-8", timeout=180).stdout
+        m = re.search(r'data-band="([^"]+)"', dom)
+        if m:
+            return json.loads(m.group(1).replace("&quot;", '"'))
+    pytest.fail("Edge returned the page without running the layout probe, twice")
 
 
 # ------------------------------------------------------------- markup
