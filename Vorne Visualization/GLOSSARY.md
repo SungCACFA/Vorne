@@ -230,12 +230,12 @@ together.
 **caution:** On a part run, elapsed minus run minus stopped leaves unscheduled
 time, which is usually the largest share.
 
-### Down h per run h
+### Unplanned h per run h
 
 **definition:** Unplanned stop hours for every hour the line spent running, on
 this product.
 
-**formula:** `down hours ÷ run hours`
+**formula:** `unplanned stop hours ÷ run hours`
 
 **answers:** Does this product stop more than the others on the same machine?
 

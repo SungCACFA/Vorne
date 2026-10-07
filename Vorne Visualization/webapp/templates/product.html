@@ -18,11 +18,11 @@ on production day {{ last_ran[1]|pday }}.{% endif %}</p>
 {% else %}
 
 <h2>Where it runs</h2>
-<p class=note>How {{ part }} does on each line. Down h per run h is unplanned stop hours for every hour the line was
+<p class=note>How {{ part }} does on each line. Unplanned h per run h is unplanned stop hours for every hour the line was
 cycling: the fair figure across products, since it does not depend on how long a run was. Available is run ÷ (run +
 down + planned) within its runs, the site's convention (planned stops count against it).{% if any_excluded %}
 Down hours here are the device's own, implausible stops included; the charts below leave them out.{% endif %}</p>
-<table><thead><tr><th>Line</th><td>Runs</td><td>{{ term('run_h') }}</td><td>{{ term('down', 'Down h') }}</td><td>{{ term('down_per_run', 'Down h') }}<small class=f>per run h</small></td>
+<table><thead><tr><th>Line</th><td>Runs</td><td>{{ term('run_h') }}</td><td>{{ term('down', 'Down h') }}</td><td>{{ term('down_per_run', 'Unplanned h') }}<small class=f>per run h</small></td>
 <td>{{ term('planned', 'Planned h') }}</td><td>{{ term('available') }}<small class=f>within its runs</small></td><td>{{ term('performance') }}<small class=f>ideal ÷ run</small></td>
 <td title="median ideal_time ÷ run_cycles, runs over 200 cycles, the current configuration level">ICT now<small class=f>s per cycle</small></td></tr></thead>
 <tbody>
@@ -53,7 +53,7 @@ table above.</p>{% endif %}
 page; the table above still includes {{ 'them' if excluded[0] != 1 else 'it' }}.</p>{% endif %}
 
 <h2>Against the line's other products</h2>
-<p class=note>Down hours per run hour for every part each line ran in this period, {{ part }} highlighted. Same
+<p class=note>Unplanned stop hours per run hour for every part each line ran in this period, {{ part }} highlighted. Same
 machine, same crew, same stop reasons, so a gap here is the product, not the line. A part well above its line-mates
 is the one to look at for material, format or setup problems; click another part to open its page. Parts with under
 one run hour in the period are left out: one stop would set their figure.</p>

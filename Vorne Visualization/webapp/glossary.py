@@ -186,9 +186,9 @@ DEFS: dict[str, Term] = {
         "share.",
         see=("down", "planned", "elapsed"), section=C),
     "down_per_run": Term(
-        "Down h per run h",
+        "Unplanned h per run h",
         "Unplanned stop hours for every hour the line spent running, on this product.",
-        "`down hours ÷ run hours`",
+        "`unplanned stop hours ÷ run hours`",
         "Does this product stop more than the others on the same machine?",
         "Only meaningful between products on the same line, where the machine, crew and stop reasons are shared. "
         "Comparing across lines compares different equipment. Counts unplanned stops only: setup and changeover "

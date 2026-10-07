@@ -608,7 +608,7 @@ def _nice_ceiling(v: float) -> float:
 
 def run_timeline(by_line: dict[str, list[dict]], span: tuple) -> Markup:
     """Every run of one part, one panel per line on a shared time axis: down
-    hours per run hour (y) at the run's start (x), dot area = run hours.
+    hours per run hour (y) at the run's start (x), dot area = run hours. (Unplanned stops only.)
 
     The y axis is capped so one run of a few minutes cannot flatten the rest;
     a run above the cap sits on it as a triangle, with its true value in the
@@ -644,7 +644,7 @@ def run_timeline(by_line: dict[str, list[dict]], span: tuple) -> Markup:
         return L + pw * min(max((t - t0).total_seconds() / secs, 0.0), 1.0)
 
     o = [f'<svg class=runs viewBox="0 0 {W} {H}" width="{W}" height="{H}" role=img '
-         f'aria-label="Every run of this part: down hours per run hour over time, one panel per line">']
+         f'aria-label="Every run of this part: unplanned stop hours per run hour over time, one panel per line">']
     ticks = _time_ticks(t0, t1)
     for k, (dev, rs) in enumerate(lines):
         top = T + k * (PH + GAP) + 16
@@ -671,7 +671,7 @@ def run_timeline(by_line: dict[str, list[dict]], span: tuple) -> Markup:
             rad = max(3.0, 11 * math.sqrt(r["run_s"] / max_run))
             title = (f"{D.nice(r['start'].astimezone(D.TZ).date())} {r['start'].astimezone(D.TZ):%H:%M}"
                      f"{' · job ' + r['job'] if r.get('job') else ''} · {_h(r['run_s'])} run h · "
-                     f"{_h(r['down_s'])} down h · {r['ratio']:.2f} down h per run h")
+                     f"{_h(r['down_s'])} unplanned h · {r['ratio']:.2f} unplanned h per run h")
             if r.get("flagged_n"):
                 title += (f" · {r['flagged_n']} implausible stop{'s' if r['flagged_n'] > 1 else ''} "
                           f"({_h(r['flagged_s'])} h) left out")
@@ -684,7 +684,7 @@ def run_timeline(by_line: dict[str, list[dict]], span: tuple) -> Markup:
             o.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{max(rad, 10):.1f}" class=hit>'
                      f'<title>{escape(title)}</title></circle>')
     o.append(f'<text x="14" y="{T + (H - T - 30) / 2}" class="axis mid" '
-             f'transform="rotate(-90 14 {T + (H - T - 30) / 2})">down h per run h</text>')
+             f'transform="rotate(-90 14 {T + (H - T - 30) / 2})">unplanned h per run h</text>')
     o.append("</svg>")
     key = ('<div class=key><span><i style="background:var(--unp);border-radius:50%"></i>One run; area = run hours</span>'
            '<span><i style="background:none;border-top:2px dashed var(--mute);height:0;vertical-align:middle"></i>'
@@ -698,7 +698,7 @@ def _ratio(rs: list[dict]) -> float | None:
 
 
 def part_compare(rows: list[dict], highlight: str, href) -> Markup:
-    """Down hours per run hour for every part on one line, this part
+    """Unplanned stop hours per run hour for every part on one line, this part
     highlighted: the like-for-like comparison, since the same line's other
     products share its crew, its machine and its reasons."""
     rs = sorted(rows, key=lambda r: -r["ratio"])
@@ -713,7 +713,7 @@ def part_compare(rows: list[dict], highlight: str, href) -> Markup:
     def X(v):
         return label_w + pw * v / xmax
     o = [f'<svg class=compare viewBox="0 0 {W} {H}" width="{W}" height="{H}" role=img '
-         f'aria-label="Down hours per run hour by part on this line">']
+         f'aria-label="Unplanned stop hours per run hour by part on this line">']
     for frac in (0, .25, .5, .75, 1.0):
         o.append(f'<line x1="{X(xmax * frac):.1f}" x2="{X(xmax * frac):.1f}" y1="{T - 4}" y2="{H - 30}" class=grid />'
                  f'<text x="{X(xmax * frac):.1f}" y="{H - 14}" class="tick mid">{xmax * frac:g}</text>')
@@ -729,7 +729,7 @@ def part_compare(rows: list[dict], highlight: str, href) -> Markup:
                  f'<text x="{X(r["ratio"]) + 6:.1f}" y="{y + 15}" class="{"lab" if me else "tick"}">{r["ratio"]:.2f}'
                  f'<tspan class=labval> · {_h(r["run_s"])} run h</tspan></text>'
                  f'<rect x="0" y="{y}" width="{W}" height="{row_h}" class=hitrow>'
-                 f'<title>{name} · {r["ratio"]:.2f} down h per run h · {_h(r["down_s"])} down h over '
+                 f'<title>{name} · {r["ratio"]:.2f} unplanned h per run h · {_h(r["down_s"])} unplanned h over '
                  f'{_h(r["run_s"])} run h · {r["runs"]} run{"s" if r["runs"] != 1 else ""}</title></rect></g>')
     o.append("</svg>")
     return Markup("".join(o))

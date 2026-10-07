@@ -7,7 +7,7 @@ from scratch (scratchpad literals.py), not with the code under test:
                       239.1 down h once 3 implausible stops are left out: 0.65 per run h.
       AreaB OTRIVIN    8 runs,  52.4 run h, 28.0 down h, 15.1 clean.
       AreaD OTRIVIN   11 runs, 132.0 run h, 88.9 down h, 51.6 clean; open since 25 Aug.
-      AreaB parts by clean down h per run h: DICLOFENAC 3.84, OMNARIS 0.65,
+      AreaB parts by clean unplanned h per run h: DICLOFENAC 3.84, OMNARIS 0.65,
       OTRIVIN 0.29, OTRIVIN_PUMPi_20ML 0.21, OMNARIS_120P 0.20.
   * OMNARIS on AreaB: Bottle Jam 202 stops, 47.2 h, first of 47 reasons.
   * Ideal cycle time: AreaB OTRIVIN reconfigured 19 Jun (0.929 -> 0.889,
@@ -118,7 +118,7 @@ def test_open_run_is_named_and_left_out(app_client):
 def test_compare_highlights_this_part_with_clean_figures(app_client):
     h = app_client.get("/product/OMNARIS?g=ytd&p=2026").get_data(as_text=True)
     svg = h[h.index("<svg class=compare"):h.index("</svg>", h.index("<svg class=compare"))]
-    order = re.findall(r"<title>([A-Za-z0-9_]+) · ([\d.]+) down h per run h", svg)
+    order = re.findall(r"<title>([A-Za-z0-9_]+) · ([\d.]+) unplanned h per run h", svg)
     assert order == [("DICLOFENAC", "3.83"), ("OMNARIS", "0.65"), ("OTRIVIN", "0.29"),
                      ("OTRIVIN_PUMPi_20ML", "0.21"), ("OMNARIS_120P", "0.20")]
     assert svg.count('class="bar"') == 1                     # only OMNARIS wears the colour
@@ -261,3 +261,11 @@ def test_line_filter_reasons_are_the_products(app_client):
     first = re.search(r"<title>([^<]+?) · ([\d.]+) h \((\d+)% of lost hours\) · ([\d,]+) stops", svg)
     assert first.groups() == ("Bottle Jam", "47.2", "20", "202")
     assert re.search(r"<title>Bottle Jam · 47.2 h lost · 202 stops", h)          # the quadrant too
+
+
+def test_the_measure_is_named_unplanned_h_per_run_h_everywhere(app_client):
+    h = app_client.get("/product/OMNARIS?g=ytd&p=2026").get_data(as_text=True)
+    assert '<a class=term href="#def-down_per_run" data-def="down_per_run">Unplanned h</a><small class=f>per run h</small>' in h
+    assert ">unplanned h per run h</text>" in h                          # the timeline's axis
+    assert re.search(r"<title>OMNARIS · [\d.]+ unplanned h per run h", h)  # the comparison chart
+    assert "down h per run h" not in h.lower() and "down hours per run hour" not in h.lower()

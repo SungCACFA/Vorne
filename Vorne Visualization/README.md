@@ -49,7 +49,7 @@ when there are, they go in `.env`, which is git-ignored.
 | `python -m webapp [--port N]` | The app. Reads the cache on every request, so a refresh shows on the next page load. Also runs the live writer for `/live` (`--no-live-writer` to leave it to a separate process). |
 | `python -m xlpipe live [--interval S]` | The live writer on its own: every device's real-time data into `current_state`, every 5 s. One writer at a time. |
 | `python -m webapp export [--out FILE] [--keep]` | A self-contained, read-only HTML snapshot of every page, product page and period (≈3 min, ≈2.6 MB). Deletes earlier exports in the same folder unless `--keep`. See below. |
-| `python -m pytest` | 395 tests, no device needed (≈4–7 min, most of it the export tests). |
+| `python -m pytest` | 396 tests, no device needed (≈4–7 min, most of it the export tests). |
 | `python tests/mutation_check.py` | Would the tests notice if the code were wrong? See Tests. |
 | `python preflight.py` | When there is a database path: DNS, TCP 5432, TLS, auth, permissions, latency, as separate steps. |
 
@@ -211,8 +211,8 @@ stopped" includes one, a note directly beneath its row says what the charts leav
 stops"), so the reader sees why a table and chart rank it differently at the row itself.
 
 **Product pages** (`/product/<part>`, linked wherever a part is named): which lines ran it and how (runs, run h,
-down h, down h per run h, availability within its runs, performance, current ICT); every run on a timeline; the
-part against the same line's other products, by down hours per run hour; its own stop-reason Pareto; ideal cycle
+down h, unplanned h per run h, availability within its runs, performance, current ICT); every run on a timeline; the
+part against the same line's other products, by unplanned stop hours per run hour; its own stop-reason Pareto; ideal cycle
 time run by run, with reconfigurations marked; changeover cost in and out of it.
 
 - Runs are the device's own part runs; run, stop and ideal hours are part_run's, verbatim. Stops are assigned to
@@ -356,7 +356,7 @@ no server and fetches nothing: open it in Edge, Chrome or Firefox, or attach it 
 
 ## Tests
 
-`python -m pytest` — 395 tests, four to seven minutes (most of it the export tests), no device. Fixtures in `tests/fixtures/devices/` (16 MB) are a
+`python -m pytest` — 396 tests, four to seven minutes (most of it the export tests), no device. Fixtures in `tests/fixtures/devices/` (16 MB) are a
 recorded first-run backfill of all four devices; the end-to-end tests replay them through the real sync into a fresh
 cache.
 
