@@ -216,9 +216,9 @@ Availability.
 
 **answers:** How long was it actually producing?
 
-**caution:** Same measure as "Actual h" on the standards table. Excludes
-stopped and unscheduled time, so it will not reconcile against elapsed time
-on its own.
+**caution:** Excludes stopped and unscheduled time, so it will not
+reconcile against elapsed time on its own. On a part run, elapsed minus run
+minus stopped leaves unscheduled time, which is usually the largest share.
 
 ### Stopped h
 
@@ -229,6 +229,20 @@ together.
 
 **caution:** On a part run, elapsed minus run minus stopped leaves unscheduled
 time, which is usually the largest share.
+
+### Down h per run h
+
+**definition:** Unplanned stop hours for every hour the line spent running, on
+this product.
+
+**formula:** `down hours ÷ run hours`
+
+**answers:** Does this product stop more than the others on the same machine?
+
+**caution:** Only meaningful between products on the same line, where the
+machine, crew and stop reasons are shared. Comparing across lines compares
+different equipment. Counts unplanned stops only: setup and changeover are
+planned stops and are not in it.
 
 ### Small stops
 

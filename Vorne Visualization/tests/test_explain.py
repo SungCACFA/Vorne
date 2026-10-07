@@ -289,7 +289,7 @@ def glossary_md() -> dict[str, dict[str, str]]:
 
 def test_every_glossary_md_entry_is_defined_word_for_word():
     md = glossary_md()
-    assert len(md) == 28                                                # 25 measures + 3 deliberately absent
+    assert len(md) == 29                                                # 26 measures + 3 deliberately absent
     by_label = {t.label: (k, t) for k, t in GL.DEFS.items() if k not in GL.NOT_IN_GLOSSARY_MD}
     assert set(by_label) == set(md)                                     # nothing dropped, nothing added
     for label, fields in md.items():

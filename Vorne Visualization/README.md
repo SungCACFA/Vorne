@@ -264,7 +264,7 @@ the point of each entry. `tests/test_explain.py` parses GLOSSARY.md and fails if
 field, or drops or adds an entry; change GLOSSARY.md first. Entries that refer to each other carry "See also" links,
 and a page lists the entries its terms refer to as well, so every link has a target. **Measures deliberately
 absent** (Quality, OEE, Labour) are linked from the footer of every page, and wherever the words appear, with why
-each is missing. One entry is not from GLOSSARY.md: "Down h per run h" (product pages) keeps the site's wording.
+each is missing.
 
 ## The sticky band
 

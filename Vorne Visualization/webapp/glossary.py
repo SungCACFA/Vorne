@@ -11,8 +11,6 @@ that file and fails if any entry here differs from it. Formulas and cautions
 keep its markup: `code` renders as code, *words* as emphasis. Change the
 wording in GLOSSARY.md first, then here.
 
-One entry is not in GLOSSARY.md: "Down h per run h" (product pages), which
-keeps the site's own wording until text for it is supplied.
 """
 
 from __future__ import annotations
@@ -176,8 +174,8 @@ DEFS: dict[str, Term] = {
         "Hours the machine was cycling.",
         None,
         "How long was it actually producing?",
-        "Same measure as \"Actual h\" on the standards table. Excludes stopped and unscheduled time, so it will not "
-        "reconcile against elapsed time on its own.",
+        "Excludes stopped and unscheduled time, so it will not reconcile against elapsed time on its own. On a part "
+        "run, elapsed minus run minus stopped leaves unscheduled time, which is usually the largest share.",
         see=("running", "elapsed"), section=C),
     "stopped_h": Term(
         "Stopped h",
@@ -187,6 +185,15 @@ DEFS: dict[str, Term] = {
         "On a part run, elapsed minus run minus stopped leaves unscheduled time, which is usually the largest "
         "share.",
         see=("down", "planned", "elapsed"), section=C),
+    "down_per_run": Term(
+        "Down h per run h",
+        "Unplanned stop hours for every hour the line spent running, on this product.",
+        "`down hours ÷ run hours`",
+        "Does this product stop more than the others on the same machine?",
+        "Only meaningful between products on the same line, where the machine, crew and stop reasons are shared. "
+        "Comparing across lines compares different equipment. Counts unplanned stops only: setup and changeover "
+        "are planned stops and are not in it.",
+        see=("down", "run_h"), section=C),
     "small_stops": Term(
         "Small stops",
         "Interruptions too brief to be logged as downtime.",
@@ -265,19 +272,10 @@ DEFS: dict[str, Term] = {
         why="Labour is calculated from a crew size entered by an operator at shift start. Across 1,803 shifts on "
             "all four lines, crew size has never been entered once. Labour hours must come from SAP.",
         section=A),
-    # ------------------------------------------- not in GLOSSARY.md: site wording
-    "down_per_run": Term(
-        "Down h per run h",
-        "Unplanned stop hours for every hour the line was cycling.",
-        "`down h ÷ run h`",
-        "How much does this product stop for each hour it runs? Fair across products, since it does not depend on "
-        "how long a run was.",
-        "A short run where one stop dominates can read very high: weigh it by run hours.",
-        see=("down", "run_h"), section=C),
 }
 
 ABSENT = ("quality", "oee", "labour")
-NOT_IN_GLOSSARY_MD = ("down_per_run",)
+NOT_IN_GLOSSARY_MD: tuple[str, ...] = ()
 
 
 def definition(key: str) -> Term:
