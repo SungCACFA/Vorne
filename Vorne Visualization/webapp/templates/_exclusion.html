@@ -3,7 +3,7 @@
   history, so they can be compared like for like. Earlier records are kept but hidden.
   {% if export %}This snapshot always uses that window; widening a line to its own earlier usable days is
   available in the live app.{% else %}Tick a line under "Widen history" to include its own earlier usable
-  days.{% endif %} Records from before a line's clock was corrected are always excluded.</p>
+  days.{% endif %} {{ term('config_epoch', "Records from before a line's clock was corrected") }} are always excluded.</p>
   <ul>
   {% for d in panel_devices %}{% set h = snap.history[d] %}
     <li><strong>{{ d }}</strong> usable from {{ h.first_usable_day|pday }}{% if d in win.widen %}, widened to include it{% endif %}.

@@ -230,9 +230,19 @@ def create_app(config_path: str | Path = ROOT / "config.yaml") -> Flask:
         return Markup(f'<a class=term href="#def-{key}" data-def="{key}">{escape(label or t.label)}</a>')
 
     def terms_used() -> list:
-        return [(k, GL.DEFS[k]) for k in g.get("terms_used", [])]
+        """The page's terms and every entry they cross-refer to, so each "see also" finds its target."""
+        return [(k, GL.DEFS[k]) for k in GL.with_references(g.get("terms_used", []))]
 
-    app.jinja_env.globals.update(term=term, terms_used=terms_used, glossary_source=GL.SOURCE)
+    import re as _re
+
+    @app.template_filter("md")
+    def md(text):
+        """GLOSSARY.md's two marks: `code` and *emphasis*. Everything else is escaped text."""
+        out = str(escape(text or ""))
+        out = _re.sub(r"`([^`]+)`", r"<code>\1</code>", out)
+        return Markup(_re.sub(r"\*([^*]+)\*", r"<em>\1</em>", out))
+
+    app.jinja_env.globals.update(term=term, terms_used=terms_used, glossary_label=lambda k: GL.DEFS[k].label)
     # highlight keys: the same helpers the charts use, so a row and its chart element always match
     app.jinja_env.filters.update(hourkey=D.hour_key, reasonkey=D.reason_key)
 

@@ -16,7 +16,7 @@
 <td>{{ '%.0f'|format(r.cumulative * 100) }}%</td></tr>
 {%- set f = flags.get(r.reason) %}
 {%- if f %}
-<tr class=flagrow{% if hl %} data-hl="{{ r.reason|reasonkey }}"{% endif %}><td colspan=6>Includes {{ f[0] }} implausible
+<tr class=flagrow{% if hl %} data-hl="{{ r.reason|reasonkey }}"{% endif %}><td colspan=6>Includes {{ f[0] }} {{ term('implausible', 'implausible') }}
 stop{{ 's' if f[0] != 1 }} ({{ f[1]|hrs }} h), left out of the charts above: there, {{ r.reason }} is
 {{ (r.seconds - f[1])|hrs }} h over {{ '{:,}'.format(r.events - f[0]) }} stop{{ 's' if r.events - f[0] != 1 }}.</td></tr>
 {%- endif %}
@@ -30,7 +30,7 @@ stop{{ 's' if f[0] != 1 }} ({{ f[1]|hrs }} h), left out of the charts above: the
 {%- endmacro %}
 
 {% macro left_out(n_s, what='this chart') -%}
-{%- if n_s and n_s[0] -%}<p class="note leftout">{{ n_s[0] }} implausible unplanned stop{{ 's' if n_s[0] != 1 }}
+{%- if n_s and n_s[0] -%}<p class="note leftout">{{ n_s[0] }} {{ term('implausible', 'implausible') }} unplanned stop{{ 's' if n_s[0] != 1 }}
 ({{ n_s[1]|hrs }} h) {{ 'are' if n_s[0] != 1 else 'is' }} left out of {{ what }}; see the panel above. The table
 below still includes {{ 'them' if n_s[0] != 1 else 'it' }}.</p>{%- endif -%}
 {%- endmacro %}
@@ -175,8 +175,7 @@ any implausible events are left out.</p>
 
 <h2 id=hours>Hour by hour, as a table</h2>
 <p class=note>What ran in each scheduled hour, newest first. Performance is ideal time over run time for that hour
-alone. {% if changeovers %}<strong>{{ changeovers }}</strong> hour{{ 's' if changeovers != 1 }} here span a part
-changeover: the device reports every part (and job) that ran in the hour, shown separated by a slash in the order
+alone. {% if changeovers %}<strong>{{ changeovers }}</strong> hour{{ 's' if changeovers != 1 }} here {{ term('changeover_hour', 'span a part changeover') }}: the device reports every part (and job) that ran in the hour, shown separated by a slash in the order
 the device lists them.{% endif %}
 {% if bad_perf %}<strong class=bad>{{ bad_perf }}</strong> hour{{ 's' if bad_perf != 1 }} show performance above 100%.
 Over 100% means the ideal cycle time configured for that part is wrong, not that the machine ran fast{% if bad_perf_short %};

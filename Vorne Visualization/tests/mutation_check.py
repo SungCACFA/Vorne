@@ -345,6 +345,20 @@ MUTATIONS: list[tuple[str, str, str, str]] = [
      "hl=true, flags=flag_by_reason or {}) }}", "hl=true) }}"),
     ("flag rows: the charts' figure stated without the excluded stop removed", "webapp/templates/line.html",
      "{{ (r.seconds - f[1])|hrs }} h over", "{{ r.seconds|hrs }} h over"),
+    # --- the glossary wording
+    ("glossary: a caution trimmed, losing a finding", "webapp/glossary.py",
+     "to capture. It was reporting schedule adherence, not asset use. Different measure, not a changed number.",
+     "to capture. Different measure, not a changed number."),
+    ("glossary: cross-referenced entries not on the page, so See also links go nowhere", "webapp/__init__.py",
+     'for k in GL.with_references(g.get("terms_used", []))]', 'for k in g.get("terms_used", [])]'),
+    ("glossary: Quality, OEE and Labour not reachable from every page", "webapp/templates/_glossary.html",
+     "{%- set absent = [term('quality'), term('oee'), term('labour')] %}", "{%- set absent = [] %}"),
+    ("glossary: formulas lose their code markup", "webapp/__init__.py",
+     'r"<code>\\1</code>", out)', 'r"\\1", out)'),
+    ("glossary: the cautions are not rendered", "webapp/templates/_glossary.html",
+     "{%- if t.caution %}", "{%- if false %}"),
+    ("glossary: a See also in the open panel jumps it elsewhere", "webapp/templates/_interact.html",
+     "      if (pop.contains(a)) { if (fill(a.dataset.def)) pop.querySelector('.defclose').focus(); return; }", "      ;"),
 ]
 
 
@@ -687,6 +701,12 @@ PINS: dict[str, str] = {
     'tiers: reduced motion still animates': 'c36f5343480c',
     'flag rows: the table no longer says what the charts leave out': 'e05e3786fa2a',
     "flag rows: the charts' figure stated without the excluded stop removed": '2f435a3f3bb2',
+    'glossary: a caution trimmed, losing a finding': '2d96355f0379',
+    'glossary: cross-referenced entries not on the page, so See also links go nowhere': '6021b54fe9b9',
+    'glossary: Quality, OEE and Labour not reachable from every page': 'bc0b9cd16342',
+    'glossary: formulas lose their code markup': '52adc390ede0',
+    'glossary: the cautions are not rendered': '98bb706f2bb6',
+    'glossary: a See also in the open panel jumps it elsewhere': 'e96bc359ae06',
 }
 
 

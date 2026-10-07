@@ -23,10 +23,10 @@
 {%- endmacro %}
 
 {% macro key() -%}
-<div class=key><span><i style="background:var(--run)"></i>Running</span>
-<span><i style="background:var(--unp)"></i>Unplanned stop</span>
-<span><i style="background:var(--pln)"></i>Planned stop</span>
-<span><i style="background:var(--nsc)"></i>Not scheduled</span></div>
+<div class=key><span><i style="background:var(--run)"></i>{{ term('running') }}</span>
+<span><i style="background:var(--unp)"></i>{{ term('down', 'Unplanned stop') }}</span>
+<span><i style="background:var(--pln)"></i>{{ term('planned', 'Planned stop') }}</span>
+<span><i style="background:var(--nsc)"></i>{{ term('not_scheduled') }}</span></div>
 {%- endmacro %}
 
 {% macro spark(dev, days) -%}
@@ -42,9 +42,9 @@
 <h2>Piece counts are not yet reliable</h2>
 <div class=flag><p>Reject count is derived as infeed minus good count rather than from scanned reject
 reasons, and the reject-event log is empty across the entire history. Where the good-count sensor
-registers more pieces than the infeed sensor saw, rejects go negative.</p>
+registers more {{ term('piece', 'pieces') }} than the infeed sensor saw, rejects go negative.</p>
 <p>The net is unchanged at hour, shift and day level, so this is a measurement fault rather than a
-timing artefact. Quality and OEE are withheld until the count inputs are reviewed.</p></div>
+timing artefact. {{ term('quality') }} and {{ term('oee') }} are withheld until the count inputs are reviewed.</p></div>
 {%- endmacro %}
 
 {% macro methodology(snap, devices) -%}

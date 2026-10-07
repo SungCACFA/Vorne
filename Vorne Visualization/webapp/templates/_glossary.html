@@ -1,21 +1,29 @@
-{#- The definitions of every measure this page named, from webapp/glossary.py. The term links point
-    here, so without scripts a definition is one jump away; with scripts this is where the panel
-    takes its text from. -#}
+{#- The definitions of every measure this page named, from webapp/glossary.py (the wording of GLOSSARY.md),
+    plus every entry they refer to. The term links point here, so without scripts a definition is one jump
+    away; with scripts this is where the panel takes its text from. The measures deliberately absent
+    (Quality, OEE, Labour) are on every page, so anyone looking for OEE finds out why it is not there. -#}
+{%- set absent = [term('quality'), term('oee'), term('labour')] %}
 {%- set used = terms_used() -%}
-{%- if used %}
 <section class=glossary aria-labelledby=defs-h>
 <h3 id=defs-h>Definitions</h3>
+<p class=absent>Not shown, on purpose: {{ absent|join(' · ') }}. Each says why.</p>
 <dl>
 {%- for k, t in used %}
 <div class=def id="def-{{ k }}" data-def-body="{{ k }}">
 <dt>{{ t.label }}</dt>
-<dd><p class=means>{{ t.means }}</p>
-<p><span class=k>Formula</span> {{ t.formula }}</p>
-<p><span class=k>What it answers</span> {{ t.answers }}</p>
-<p><span class=k>Caution</span> {{ t.caution }}</p></dd>
+<dd>{% if t.status %}<p class=means>{{ t.status }}</p>
+<p><span class=k>Why</span> {{ t.why|md }}</p>
+{%- else %}<p class=means>{{ t.means|md }}</p>
+{%- if t.formula %}
+<p><span class=k>Formula</span> {{ t.formula|md }}</p>{% endif %}
+{%- if t.answers %}
+<p><span class=k>What it answers</span> {{ t.answers|md }}</p>{% endif %}
+{%- if t.caution %}
+<p><span class=k>Caution</span> {{ t.caution|md }}</p>{% endif %}
+{%- endif %}
+{%- if t.see %}
+<p class=see><span class=k>See also</span> {% for s in t.see %}<a class=term href="#def-{{ s }}" data-def="{{ s }}">{{ glossary_label(s) }}</a>{{ ', ' if not loop.last }}{% endfor %}</p>{% endif %}</dd>
 </div>
 {%- endfor %}
 </dl>
-<p class=defsrc>Wording: {{ glossary_source }}.</p>
 </section>
-{%- endif %}

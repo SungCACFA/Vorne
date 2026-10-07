@@ -10,8 +10,8 @@
 {%- set mine = opens|selectattr('channel', 'equalto', channel)|list -%}
 <h2>{{ title }}</h2><p class=note>{{ lead }}</p>
 <div class=scroll><table class=prod><thead><tr><th>Part</th><td class=left>Job</td><td class=left>Line</td>
-<td class=left>Started</td><td>{{ term('elapsed') }}<small class=f>d / h</small></td><td>{{ term('run_h') }}</td><td>{{ term('earned_h') }}</td><td>{{ term('stopped_h') }}</td><td>Run cycles</td>
-<td>{{ term('actual_spc') }}</td><td>vs derived</td></tr></thead>
+<td class=left>Started</td><td>{{ term('elapsed') }}<small class=f>d / h</small></td><td>{{ term('run_h') }}</td><td>{{ term('earned_h') }}</td><td>{{ term('stopped_h') }}</td><td>{{ term('run_cycles') }}</td>
+<td>{{ term('actual_spc') }}</td><td>{{ term('vs_derived') }}</td></tr></thead>
 <tbody>
 {% for o in mine %}
 <tr class=open><th>{{ o.part|partlink }} <span class="badge{{ '' if o.reasons else ' mild' }}">{{ term('open_run', 'open') }}{{ ' · ' ~ '%.0f'|format(o.open_days) ~ ' d' if o.reasons }}</span></th>
@@ -74,7 +74,7 @@ they were when this file was exported; edit them in the live app. SAP values are
 <td>{{ term('derived_ict') }}<small class=f>s per cycle</small></td>
 <td title="hand-entered; NULL means not configured">Pieces per cycle</td>
 <td title="hand-entered, in the unit selected above">SAP standard<small class=f>{{ dict(units)[unit]|lower }}</small></td>
-<td>{{ term('actual_spc', 'Actual') }}<small class=f>s per cycle</small></td><td>vs derived</td><td>vs SAP</td>
+<td>{{ term('actual_spc', 'Actual') }}<small class=f>s per cycle</small></td><td>{{ term('vs_derived') }}</td><td>vs SAP</td>
 <td>{{ term('run_h') }}</td><td>{{ term('earned_h') }}</td>
 {% if any_sap %}<td>Earned h, SAP</td>{% endif %}
 <td>{{ term('variance_h') }}</td><td>Actual<small class=f>s per piece</small></td>

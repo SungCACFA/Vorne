@@ -79,7 +79,8 @@ def test_charts_leave_flagged_events_out_and_say_so(app_client):
     html = app_client.get("/line/AreaB?g=ytd&p=2026").get_data(as_text=True)
     notes = re.findall(r'<p class="note leftout">(.*?)</p>', html, re.S)
     assert len(notes) == 3                                          # quadrant, Pareto, rhythm
-    assert all("6 implausible unplanned stops (173 h)" in re.sub(r"\s+", " ", n) for n in notes)
+    assert all("6 implausible unplanned stops (173 h)" in re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", n))
+               for n in notes)                                       # "implausible" is a definition link
     # ...while the table beneath keeps them: Pick & Place 2 is still 63.5 h there
     why = html[html.index("<h2>Why it stopped"):html.index("<h2>Planned stops")]
     assert re.search(r"<th>Pick &amp; Place 2</th>.*?<td>63.5</td><td>56</td>", why, re.S)
@@ -209,7 +210,7 @@ def test_july_panel_adjusts_availability_too(app_client):
 def flag_notes(html):
     why = html[html.index("<h2>Why it stopped"):html.index("<h2>Planned stops")]
     notes = re.findall(r"<tr class=flagrow[^>]*><td colspan=6>(.*?)</td></tr>", why, re.S)
-    return why, [re.sub(r"\s+", " ", n).replace("&amp;", "&") for n in notes]
+    return why, [re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", n)).replace("&amp;", "&") for n in notes]
 
 
 def test_a_flagged_row_says_why_it_ranks_differently(app_client):

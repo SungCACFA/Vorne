@@ -22,10 +22,10 @@ ASKED_FOR = ("available", "performance", "calendar_use", "earned_h", "variance_h
 
 # ------------------------------------------------------------ the module
 
-def test_every_measure_asked_for_is_defined_in_full():
+def test_every_measure_asked_for_is_defined_with_its_caution():
     for key in ASKED_FOR:
         t = GL.DEFS[key]
-        assert all(len(v) > 10 for v in (t.means, t.formula, t.answers, t.caution)), key
+        assert t.means and t.answers and len(t.caution) > 40, key       # the formula only where there is one
 
 
 def test_the_page_shows_the_modules_wording_and_nothing_else(app_client):
@@ -33,7 +33,7 @@ def test_the_page_shows_the_modules_wording_and_nothing_else(app_client):
     t = GL.DEFS["calendar_use"]
     block = h[h.index('id="def-calendar_use"'):]
     block = unescape(re.sub(r"<[^>]+>", " ", block[:block.index("</div>")]))
-    for part in (t.label, t.means, t.formula, t.answers, t.caution):
+    for part in (t.label, t.means, t.formula.strip("`"), t.answers, t.caution):
         assert part in re.sub(r"\s+", " ", block), part
 
 
@@ -145,6 +145,10 @@ addEventListener('load', () => setTimeout(() => {
   term.click();                                   // what Enter on a focused link does
   o.opens = !pop.hidden && pop.querySelector('h3').textContent === 'Available';
   o.focusMoves = pop.contains(document.activeElement);
+  const where = pop.style.left + pop.style.top, see = pop.querySelector('.see a.term[data-def="planned"]');
+  see.click();                                    // a cross-reference inside the open panel
+  o.seeAlsoInPlace = !pop.hidden && pop.querySelector('h3').textContent === 'Planned stop'
+                     && pop.style.left + pop.style.top === where;
   document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
   o.escapeCloses = pop.hidden && document.activeElement === term;
   term.click();
@@ -170,7 +174,7 @@ def run_probe(html, tmp_path):
 def test_tooltips_and_definitions_in_a_browser(app_client, tmp_path):
     o = run_probe(app_client.get("/line/AreaB?g=month&p=2026-09").get_data(as_text=True), tmp_path)
     assert o == {"hover": True, "nativeTitleGone": True, "flips": True, "hidesOffChart": True, "tapShows": True,
-                 "secondTapHides": True, "opens": True, "focusMoves": True, "escapeCloses": True,
+                 "secondTapHides": True, "opens": True, "focusMoves": True, "seeAlsoInPlace": True, "escapeCloses": True,
                  "clickOutsideCloses": True}
 
 
@@ -263,3 +267,80 @@ def test_pointing_at_either_side_lights_the_other(app_client, tmp_path):
     o = json.loads(unescape(re.search(r'data-probe="([^"]+)"', dom).group(1)))
     assert o == {"fromRow": [True, True, True], "othersDark": 3, "fromBubble": [True, True, True],
                  "hourCell": [True], "cellLightsRow": True, "cleared": 0}
+
+
+# --------------------------------------------- the wording is GLOSSARY.md's
+
+FIELDS = {"definition": "means", "formula": "formula", "answers": "answers", "caution": "caution",
+          "status": "status", "why": "why"}
+
+
+def glossary_md() -> dict[str, dict[str, str]]:
+    """GLOSSARY.md, parsed on its own terms: each ### heading, and its **field:** paragraphs."""
+    text = (Path(__file__).parent.parent / "GLOSSARY.md").read_text(encoding="utf-8")
+    out = {}
+    for block in re.split(r"^### ", text, flags=re.M)[1:]:
+        head, _, body = block.partition("\n")
+        body = re.split(r"\n---|\n## ", body)[0]
+        fields = re.findall(r"\*\*(\w+):\*\*\s*(.*?)(?=\n\s*\*\*\w+:\*\*|\Z)", body, re.S)
+        out[head.strip()] = {FIELDS[k]: " ".join(v.split()) for k, v in fields}
+    return out
+
+
+def test_every_glossary_md_entry_is_defined_word_for_word():
+    md = glossary_md()
+    assert len(md) == 28                                                # 25 measures + 3 deliberately absent
+    by_label = {t.label: (k, t) for k, t in GL.DEFS.items() if k not in GL.NOT_IN_GLOSSARY_MD}
+    assert set(by_label) == set(md)                                     # nothing dropped, nothing added
+    for label, fields in md.items():
+        _, t = by_label[label]
+        for name in ("means", "formula", "answers", "caution", "status", "why"):
+            assert (getattr(t, name) or None) == fields.get(name), (label, name)
+
+
+def test_the_cautions_survive():
+    """The cautions are the point. Spot-check that the findings they record are there in full."""
+    assert "ADVIL in three different carton sizes shares one cycle time" in GL.DEFS["derived_ict"].caution
+    assert "Across 1,803 shifts on all four lines, crew size has never been entered once" in GL.DEFS["labour"].why
+    assert "It was reporting schedule adherence, not asset use." in GL.DEFS["calendar_use"].caution
+
+
+def test_absent_measures_are_reachable_from_every_page(app_client):
+    for url in ("/?g=month&p=2026-09", "/line/FR8?g=month&p=2026-09", "/products?g=month&p=2026-09",
+                "/product/OTRIVIN?g=ytd&p=2026", "/live"):
+        h = app_client.get(url).get_data(as_text=True)
+        foot = h[h.index("<footer>"):]
+        for k in GL.ABSENT:
+            assert f'<a class=term href="#def-{k}" data-def="{k}">' in foot, (url, k)
+            assert f'data-def-body="{k}"' in foot, (url, k)
+        assert "Withheld." in foot and "Not available from the devices." in foot
+
+
+def test_oee_is_linked_where_the_word_appears(app_client):
+    h = app_client.get("/?g=month&p=2026-09").get_data(as_text=True)
+    assert ('<a class=term href="#def-quality" data-def="quality">Quality</a> and '
+            '<a class=term href="#def-oee" data-def="oee">OEE</a> are withheld') in h
+
+
+def test_cross_references_link_and_their_targets_are_on_the_page(app_client):
+    h = app_client.get("/products?g=month&p=2026-09").get_data(as_text=True)
+    var = h[h.index('data-def-body="variance_h"'):]
+    var = var[:var.index("</div>")]
+    assert '<a class=term href="#def-performance" data-def="performance">Performance</a>' in var
+    assert 'data-def-body="performance"' in h                           # the target is there to open
+    run = h[h.index('data-def-body="running"'):]
+    assert '<em>small stops</em>' in run[:run.index("</div>")]          # GLOSSARY.md's emphasis kept
+
+
+def test_formulas_render_as_code_and_absent_parts_are_not_invented(app_client):
+    h = app_client.get("/products?g=month&p=2026-09").get_data(as_text=True)
+    ict = h[h.index('data-def-body="derived_ict"'):]
+    ict = ict[:ict.index("</div>")]
+    assert "<code>median of (ideal time ÷ run cycles)</code> across runs over 200 cycles" in ict
+    run = h[h.index('data-def-body="run_h"'):]
+    assert "Formula" not in run[:run.index("</div>")]                    # GLOSSARY.md gives Run h no formula
+
+
+def test_no_provisional_note(app_client):
+    h = app_client.get("/?g=month&p=2026-09").get_data(as_text=True)
+    assert "provisional" not in h.lower() and "to be replaced" not in h
