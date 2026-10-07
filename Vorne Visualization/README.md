@@ -49,7 +49,7 @@ when there are, they go in `.env`, which is git-ignored.
 | `python -m webapp [--port N]` | The app. Reads the cache on every request, so a refresh shows on the next page load. Also runs the live writer for `/live` (`--no-live-writer` to leave it to a separate process). |
 | `python -m xlpipe live [--interval S]` | The live writer on its own: every device's real-time data into `current_state`, every 5 s. One writer at a time. |
 | `python -m webapp export [--out FILE] [--keep]` | A self-contained, read-only HTML snapshot of every page, product page and period (≈3 min, ≈2.6 MB). Deletes earlier exports in the same folder unless `--keep`. See below. |
-| `python -m pytest` | 359 tests, no device needed (≈4–7 min, most of it the export tests). |
+| `python -m pytest` | 360 tests, no device needed (≈4–7 min, most of it the export tests). |
 | `python tests/mutation_check.py` | Would the tests notice if the code were wrong? See Tests. |
 | `python preflight.py` | When there is a database path: DNS, TCP 5432, TLS, auth, permissions, latency, as separate steps. |
 
@@ -328,7 +328,7 @@ no server and fetches nothing: open it in Edge, Chrome or Firefox, or attach it 
 
 ## Tests
 
-`python -m pytest` — 359 tests, four to seven minutes (most of it the export tests), no device. Fixtures in `tests/fixtures/devices/` (16 MB) are a
+`python -m pytest` — 360 tests, four to seven minutes (most of it the export tests), no device. Fixtures in `tests/fixtures/devices/` (16 MB) are a
 recorded first-run backfill of all four devices; the end-to-end tests replay them through the real sync into a fresh
 cache.
 
@@ -361,7 +361,7 @@ in that code would be compared with itself and pass.
 
 ### Mutation check
 
-`python tests/mutation_check.py` applies, one at a time, 102 deliberate bugs of the kind a refactor or a "helpful" fix
+`python tests/mutation_check.py` applies, one at a time, 103 deliberate bugs of the kind a refactor or a "helpful" fix
 could introduce — clamping a count, inverting a ratio, taking a mean for a median, starting weeks on Sunday — runs
 the suite against each, and restores the original. A bug the suite does not notice is a gap. It takes several minutes;
 `--list` shows the bugs, and numbers run a subset.
@@ -390,7 +390,7 @@ re-read the mutation against the new code before taking the new pin: updating it
 
 **One run at a time, and nothing edited while it runs.** A run holds `.mutation_run.lock` (created exclusively; a
 second run refuses to start, exit 2) and keeps the original bytes of the file it has mutated in
-`.mutation_run.original`. It hashes every source file before the first mutation and checks them before and after each
+`.mutation_run.original`. It hashes every source file before its baseline run (an edit made while the baseline ran used to slip through: the snapshot was taken after it) and checks them after the baseline and before and after each
 one. An edit saved mid-run would otherwise be wiped by the restore, or keep the mutation, or change what later
 mutations test; so on any change the run stops with no verdict (exit 3), restores the original, and keeps the edited
 file as `<file>.edited-during-mutation`. A lock left behind means a run was killed: `--check` shows whether a file was

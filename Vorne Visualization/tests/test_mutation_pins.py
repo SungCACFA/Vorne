@@ -131,3 +131,23 @@ def test_editing_any_other_source_mid_run_stops(project, capsys):
     calls["during"] = lambda: (root / "webapp" / "other.py").write_bytes(b"Y = 2\n")
     assert M.main([]) == 3
     assert "webapp" in capsys.readouterr().out and (root / "webapp" / "other.py").read_bytes() == b"Y = 2\n"
+
+
+def test_editing_during_the_baseline_run_stops(project, monkeypatch, capsys):
+    """The fourth silent failure: the snapshot used to be taken after the baseline, so an edit made
+    while the baseline ran became the reference and went unnoticed."""
+    root, calls = project
+    other = root / "webapp" / "other.py"
+
+    def suite():
+        calls["n"] += 1
+        if calls["n"] == 1:                       # the baseline
+            other.write_bytes(b"Y = 3\n")
+        return (0, 1)
+    monkeypatch.setattr(M, "run_suite", suite)
+    assert M.main([]) == 3
+    out = capsys.readouterr().out
+    assert "source changed during the baseline run: webapp" in out and "No verdict" in out
+    assert calls["n"] == 1                        # no mutation was run against the edited code
+    assert (root / "webapp" / "m.py").read_bytes() == b"def f(x):\n    return x + 1\n"
+    assert not (root / ".mutation_run.lock").exists()

@@ -302,6 +302,9 @@ MUTATIONS: list[tuple[str, str, str, str]] = [
      '({w[key] - prev:+.0f} min on the week before)', '({prev - w[key]:+.0f} min on the week before)'),
     ("quadrant tooltip: the zone's implication dropped", "webapp/charts.py",
      "{name}\\n{action[0].upper() + action[1:]}", "{name}\\n{name}"),
+    ("runner: an edit during the baseline run goes unnoticed", "tests/mutation_check.py",
+     "    if edited := changed_since(" "before):\n        raise EditedDuringRun(f\"source changed during the baseline",
+     "    if edited := []:\n        raise EditedDuringRun(f\"source changed during the baseline"),
 ]
 
 
@@ -467,12 +470,16 @@ def main(argv: list[str]) -> int:
 
 def _run(chosen: list[int]) -> int:
     clear_bytecode()
+    # Snapshot before the baseline, not after it: an edit made while the baseline ran would otherwise
+    # become the reference, unnoticed, and the baseline would have tested code that no longer exists.
+    before = snapshot()
     base_failed, _ = run_suite()
+    if edited := changed_since(before):
+        raise EditedDuringRun(f"source changed during the baseline run: {', '.join(edited)}")
     if base_failed:
         print("the suite fails without any mutation; fix that first")
         return 2
     caught = 0
-    before = snapshot()
     for i in chosen:
         name, rel, old, new = MUTATIONS[i - 1]
         path = ROOT / rel
@@ -621,6 +628,7 @@ PINS: dict[str, str] = {
     'Pareto tooltip: the 80% count is of the shown bars': 'bcc97935524a',
     'rhythm tooltip: change from the previous week inverted': '78d39adefd2c',
     "quadrant tooltip: the zone's implication dropped": '851c37b6eeeb',
+    'runner: an edit during the baseline run goes unnoticed': '2cb6dcba30ce',
 }
 
 
