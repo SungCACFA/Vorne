@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% from "_macros.html" import counts_flag, methodology %}
+
+{% macro ratio(v) -%}
+{%- if v is none -%}—{%- else -%}<span class="{{ 'over' if v > 1.15 else 'under' if v < 0.95 else '' }}">{{ '%.2f'|format(v) }}×</span>{%- endif -%}
+{%- endmacro %}
+{% macro n3(v) -%}{{ '—' if v is none else '%.3f'|format(v) }}{%- endmacro %}
+
+{% macro run_table(title, lead, closed, channel, after='') -%}
+{%- set mine = opens|selectattr('channel', 'equalto', channel)|list -%}
+<h2>{{ title }}</h2><p class=note>{{ lead }}</p>
+<div class=scroll><table class=prod><thead><tr><th>Part</th><td class=left>Job</td><td class=left>Line</td>
+<td class=left>Started</td><td title="days, with hours beneath for subtracting">Elapsed<small class=f>d / h</small></td><td>Run h</td><td>Earned h</td><td>Stopped h</td><td>Run cycles</td>
+<td>Actual s/cycle</td><td>vs derived</td></tr></thead>
+<tbody>
+{% for o in mine %}
+<tr class=open><th>{{ o.part|partlink }} <span class="badge{{ '' if o.reasons else ' mild' }}">open{{ ' · ' ~ '%.0f'|format(o.open_days) ~ ' d' if o.reasons }}</span></th>
+<td class=left>{{ o.job or '—' }}</td><td class=left>{{ o.device_id }}</td><td class="left nw">{{ o.start|local }}</td>
+<td>{{ o.open_seconds|elapsed }}</td><td>{{ o.run_seconds|h1 }}</td>
+<td colspan=5 class=left><span class=state>still accumulating; not in the totals above{{ ' — ' ~ o.reasons|join('; ') if o.reasons }}</span></td></tr>
+{% endfor %}
+{% for r in closed[:100] %}
+{%- set d = ict.get((r.device_id, r.part), {}) -%}
+{%- set act = (r.run_time / r.run_cycles) if r.run_cycles else none -%}
+<tr><th>{{ r.part|partlink }}</th><td class=left>{{ r.job or '—' }}</td><td class=left>{{ r.device_id }}</td>
+<td class="left nw">{{ r.start|local }}</td>
+<td>{{ ((r.end - r.start).total_seconds() if r.end and r.start else 0)|elapsed }}</td>
+<td>{{ r.run_time|h1 }}</td><td>{{ r.ideal_time|h1 }}</td>
+<td>{{ ((r.unplanned_stop_time or 0) + (r.planned_stop_time or 0))|h1 }}</td>
+<td>{{ '{:,.0f}'.format(r.run_cycles or 0) }}</td><td>{{ n3(act) }}</td>
+<td>{{ ratio(act / d.ict if act and d.ict else none) }}</td></tr>
+{% endfor %}
+</tbody></table></div>
+{% if closed|length > 100 %}<p class=note>Longest 100 of {{ closed|length }} closed runs in this period.</p>{% endif %}
+{% if after %}<p class=note>{{ after|safe }}</p>{% endif %}
+{%- endmacro %}
+
+{% block title %}Products · Danbro packaging{% endblock %}
+{% block sub %}Standards and variance · {{ win.period_label }}{% endblock %}
+
+{% block body %}
+<h2>Standards and variance</h2>
+<p class=note>One row per part per line, for runs that started in this period. The derived ideal cycle time is the
+median of ideal time ÷ run cycles over that line's runs of more than 200 cycles, all usable history; it is per
+machine <em>cycle</em>. Pieces per cycle and the SAP standard are yours to enter. With pieces per cycle filled in, the
+SAP per-piece standard converts to per cycle and can be compared. <strong>Run h</strong> is cycling time only: time the line was cycling, including slow cycles and small stops (any cycle shorter than the down threshold), but no down time and no planned stops.</p>
+
+{% if export %}<p class=note><strong>Read-only snapshot.</strong> SAP standards and pieces per cycle are shown as
+they were when this file was exported; edit them in the live app. SAP values are shown in seconds per piece.</p>
+{% else %}<div class=tools>
+  <form method=get action="{{ url_for('products') }}" style="display:contents">
+    <input type=hidden name=g value="{{ win.gran }}">{% if win.period %}<input type=hidden name=p value="{{ win.period }}">{% endif %}
+    {% for w in win.widen %}<input type=hidden name=widen value="{{ w }}">{% endfor %}
+    <label for=unit>Unit of SAP values</label>
+    <select id=unit name=u onchange="this.form.submit()">
+      {% for k, l in units %}<option value="{{ k }}"{% if k == unit %} selected{% endif %}>{{ l }}</option>{% endfor %}
+    </select>
+  </form>
+  <form method=post enctype=multipart/form-data action="{{ url_for('import_standards') }}{{ win.query(u=unit) }}" style="display:contents">
+    <input type=hidden name=u value="{{ unit }}">
+    <label for=sapfile>Load CSV</label><input type=file id=sapfile name=file accept=".csv,text/csv" onchange="this.form.submit()">
+  </form>
+  <a class=btn href="{{ url_for('export_standards') }}">Export CSV</a>
+</div>{% endif %}
+{% if imported is not none %}<p class=msg>Imported {{ imported }} part{{ '' if imported == '1' else 's' }} from CSV.</p>{% endif %}
+{% for e in import_errors %}<p class="msg bad">{{ e }}</p>{% endfor %}
+
+{% if not rows %}
+<p class=empty>No part runs started in this period.</p>
+{% else %}
+{% set any_sap = rows|selectattr('sap_spc')|list %}
+<div class=scroll><table class=prod><thead><tr>
+<th>Part</th><td class=left>Line</td><td>Runs</td>
+<td title="median ideal_time ÷ run_cycles, runs over 200 cycles">Derived ICT<small class=f>s per cycle</small></td>
+<td title="hand-entered; NULL means not configured">Pieces per cycle</td>
+<td title="hand-entered, in the unit selected above">SAP standard<small class=f>{{ dict(units)[unit]|lower }}</small></td>
+<td>Actual<small class=f>s per cycle</small></td><td>vs derived</td><td>vs SAP</td>
+<td title="cycling time only, including slow cycles and small stops">Run h</td><td title="ideal time: cycles × the device's configured ideal cycle time">Earned h</td>
+{% if any_sap %}<td>Earned h, SAP</td>{% endif %}
+<td title="actual − earned">Variance h</td><td>Actual<small class=f>s per piece</small></td>
+</tr></thead>
+<tbody>
+{% for r in rows %}
+<tr{% if r.open %} class=open{% endif %}><th>{{ r.part|partlink }}{% if r.open %} <span class=badge title="An open run of this part on this line is not in these figures">open run</span>{% endif %}</th>
+<td class=left>{{ r.dev }}</td><td>{{ r.runs }}</td>
+<td>{{ n3(r.ict) }}
+  {%- if r.ict is none %}<span class=state>no run over 200 cycles</span>
+  {%- elif r.ict_sd is none %}<span class=state>1 run: spread unknown</span>
+  {%- elif r.ict_sd > 0.05 %}<small class=warn>unstable (sd {{ '%.3f'|format(r.ict_sd) }})</small>{% endif %}
+  {%- for c in r.ict_changes %}<small class=warn>reconfigured {{ c.start|local }}: {{ '%.3f'|format(c.before) }} to {{ '%.3f'|format(c.after) }}</small>{% endfor %}</td>
+{% if export %}<td>{% if r.epc %}{{ '%g'|format(r.epc) }}{% else %}<span class=state>not configured</span>{% endif %}</td>
+<td>{% if r.sap_display %}{{ '%g'|format(r.sap_display|round(4)) }}{% else %}<span class=state>none</span>{% endif %}</td>
+{% else %}<td><input class=epc data-part="{{ r.part }}" value="{{ '%g'|format(r.epc) if r.epc else '' }}" placeholder="not set" title="Pieces per cycle not configured" aria-label="Pieces per cycle for {{ r.part }}"></td>
+<td><input class=sap data-part="{{ r.part }}" value="{{ '%g'|format(r.sap_display|round(4)) if r.sap_display else '' }}" placeholder="—" aria-label="SAP standard for {{ r.part }}"></td>{% endif %}
+<td>{{ n3(r.actual_spc) }}</td><td>{{ ratio(r.vs_ict) }}</td>
+<td>{% if r.sap_state %}<span class=state>{{ r.sap_state }}</span>{% else %}{{ ratio(r.vs_sap) }}{% endif %}</td>
+<td>{{ r.run|hrs }}</td><td>{{ r.ideal|hrs }}</td>
+{% if any_sap %}<td>{{ r.earned_sap|hrs if r.earned_sap is not none else '—' }}</td>{% endif %}
+<td>{{ ((r.run - r.ideal) / 3600)|round(1) }}</td>
+<td>{% if r.actual_spp is not none %}{{ n3(r.actual_spp) }}{% else %}<span class=state>counts untrusted</span>{% endif %}</td></tr>
+{% endfor %}
+</tbody></table></div>
+<p class=note><strong>SAP comparison</strong> needs pieces per cycle for the part. XL was never told it (its own
+setting is 0.0 on every device, the same root cause as the count defect), so until someone enters it here the
+column reads "pieces/cycle not configured". <strong>Per-piece figures</strong> come only from configuration epochs
+whose counts are trusted. None are yet, so that column explains itself instead of showing a number.</p>
+{% endif %}
+
+{{ run_table('Part runs', 'One row per part run, longest first. Open runs are listed first and marked; they are not in any total until they close. <strong>Run h</strong> is cycling time only: time the line was cycling, including slow cycles and small stops (any cycle shorter than the down threshold), but no down time and no planned stops.', part_runs, 'part',
+   after='<strong>Where the rest of the elapsed time went.</strong> Elapsed minus Run h minus Stopped h is time the line '
+         ~ 'was not scheduled: nights, weekends and other unscheduled blocks that fell inside the run. It is not shown '
+         ~ 'here because a part run is not a scheduling window, only the span between one part starting and the next. '
+         ~ 'For how much of the calendar was scheduled, see <a class=lnk href="' ~ url_for('overview') ~ win.query() ~ '">calendar use on the overview</a>.') }}
+{{ run_table('Job runs', 'Same shape, by job or lot number. Today every job run matches a part run exactly, but the device keeps them as separate channels, so this page does not assume it.', job_runs, 'job') }}
+
+{{ counts_flag() }}
+
+{% if not export %}<script>
+document.addEventListener('change', async ev => {
+  const i = ev.target.closest('input.sap, input.epc');
+  if (!i) return;
+  const body = {part: i.dataset.part, field: i.classList.contains('sap') ? 'sap' : 'epc',
+                value: i.value, unit: {{ unit|tojson }}};
+  const r = await fetch({{ url_for('set_standard')|tojson }}, {method: 'POST',
+    headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+  const j = await r.json().catch(() => ({ok: false, error: 'server error'}));
+  if (j.ok) { location.reload(); } else { i.classList.add('err'); i.title = j.error; }
+});
+</script>{% endif %}
+{% endblock %}
+
+{% block footer %}
+{{ methodology(snap, snap.devices) }}
+<p>Earned hours are the device's ideal time: run cycles × the ideal cycle time configured on the XL. Variance =
+actual run hours − earned. Ratios above 1.15× are slower than standard, below 0.95× faster. A part's SAP standard and
+pieces per cycle are shared by every line that runs it. Hand-entered values live in the local cache; export the CSV
+before any cache rebuild.</p>
+{% endblock %}

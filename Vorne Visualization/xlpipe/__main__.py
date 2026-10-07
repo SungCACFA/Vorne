@@ -90,6 +90,7 @@ def cmd_refresh(args, cfg) -> int:
             restamped = store.restamp_epochs()
             if restamped:
                 logging.info("config_epoch re-stamped on %d row(s)", restamped)
+            logging.info("part_standard refreshed for %d part(s)", store.refresh_part_standard())
         finally:
             store.close()
 

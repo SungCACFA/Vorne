@@ -8,6 +8,37 @@ sync:
   page_size: 1000         # records per request during backfill
   max_delete_fraction: 0.2
 
+# Line-page chart thresholds: the one place to set them. Deliberately FIXED
+# values, never derived from the data: a line that moved with each period
+# would let the same stop reason change zone between periods, and nobody
+# would trust the chart.
+charts:
+  # Stop-reason quadrant, "frequent" vs "rare": more than this many stops of
+  # a reason per production day (with records) in the selected period.
+  frequent_stops_per_production_day: 1
+  # Stop-reason quadrant, "long" vs "short": mean minutes per stop. 30 is
+  # roughly where a stop stops being something an operator clears and needs
+  # a callout. To be confirmed with the floor's actual callout threshold.
+  long_stop_minutes: 30
+  # Implausible durations: a single planned or unplanned stop is flagged when
+  # it runs longer than implausible_cap_hours of net time, or longer than
+  # implausible_floor_hours AND more than implausible_times_median times that
+  # state's median on that line. Catches a parked line left in "maintenance"
+  # (AreaB, July 2026: one 260 h event) or a "down" left open over a weekend.
+  implausible_cap_hours: 24
+  implausible_floor_hours: 12
+  implausible_times_median: 10
+  # Run/stop rhythm: mark the week the mean run burst stepped to a new level,
+  # only if the step is at least this large (0.25 = 25%) and stands this many
+  # standard errors clear of the week-to-week noise. AreaB, May 2026: -60%, t 6.5.
+  rhythm_change_min_shift: 0.25
+  rhythm_change_min_t: 3
+  # Product pages, ideal cycle time: runs within this fraction of a level's
+  # median belong to it; a run further off that the next run confirms starts
+  # a new level (a reconfiguration). On an unchanged configuration runs agree
+  # within 2% (FR8 ESTRADIOL, 88 runs). AreaB OTRIVIN, 19 Jun 2026: -4%.
+  ict_change_tolerance: 0.03
+
 # Channels per BRIEF section 3. `instant` is deprecated - do not add it.
 channels: [shift_hour, shift, process_state, part, job, quality_event]
 

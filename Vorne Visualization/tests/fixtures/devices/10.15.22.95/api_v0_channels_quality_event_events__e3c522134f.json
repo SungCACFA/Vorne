@@ -1,0 +1,23 @@
+{
+ "request": {
+  "path": "api/v0/channels/quality_event/events",
+  "params": {
+   "fields": "record_id,sync_id,record_order,production_day_number,reject_reason,reject_reason_display_name,count,event_id,slice_order",
+   "sort": "sync_id",
+   "limit": "1000",
+   "sync_id[gt]": "-1"
+  }
+ },
+ "status": 200,
+ "recorded_at": "2026-10-06T13:22:57-0400",
+ "response": {
+  "data": {
+   "events": []
+  },
+  "meta": {
+   "asset_id": "18ebfdbc-4202-458e-9589-2770cd4e9de1",
+   "data_version": "1.6",
+   "device_id": "3C:E4:B0:0E:98:E0"
+  }
+ }
+}

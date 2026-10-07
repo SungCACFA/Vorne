@@ -98,6 +98,22 @@ def build_row(
         m = re.search(r"([+-]\d\d:\d\d|Z)$", raw_start)
         out.utc_offset = m.group(1) if m else None
 
+    row, problems = convert(spec, device_id, values, out)
+    if problems:
+        out.status, out.reason = MALFORMED, "; ".join(problems)
+        return out
+    out.row = row
+    return out
+
+
+def convert(spec: ChannelSpec, device_id: str, values: dict[str, Any],
+            out: Built | None = None) -> tuple[dict[str, Any], list[str]]:
+    """Type-convert one record into a row, whether closed or open.
+
+    Returns (row, problems); a non-empty problems list means the record is
+    malformed. `out`, if given, collects NaN/inf and day-span bookkeeping.
+    """
+    out = out if out is not None else Built(OK)
     row: dict[str, Any] = {"device_id": device_id}
     problems: list[str] = []
     for f in spec.wanted:
@@ -140,8 +156,4 @@ def build_row(
             problems.append(f"{f}={raw!r} is not a valid {kind}")
         row[col] = v
 
-    if problems:
-        out.status, out.reason = MALFORMED, "; ".join(problems)
-        return out
-    out.row = row
-    return out
+    return row, problems

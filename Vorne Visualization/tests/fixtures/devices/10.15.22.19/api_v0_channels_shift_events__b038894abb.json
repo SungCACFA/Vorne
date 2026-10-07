@@ -1,0 +1,35 @@
+{
+ "request": {
+  "path": "api/v0/channels/shift/events",
+  "params": {
+   "fields": "shift_event_id,sync_id",
+   "sort": "-sync_id",
+   "limit": "3"
+  }
+ },
+ "status": 200,
+ "recorded_at": "2026-10-06T13:22:55-0400",
+ "response": {
+  "data": {
+   "events": [
+    [
+     522,
+     17232
+    ],
+    [
+     521,
+     17218
+    ],
+    [
+     520,
+     17197
+    ]
+   ]
+  },
+  "meta": {
+   "asset_id": "c0fe9f9d-439e-435a-a1c6-36ea56234a7a",
+   "data_version": "1.6",
+   "device_id": "3C:E4:B0:53:9D:EC"
+  }
+ }
+}

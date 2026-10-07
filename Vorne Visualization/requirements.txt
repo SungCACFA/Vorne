@@ -1,5 +1,7 @@
 requests>=2.31
 PyYAML>=6
+Flask>=3.0
 tzdata              # IANA timezones on Windows (America/Toronto)
-truststore>=0.9     # for any outbound HTTPS: this network does TLS inspection
-# psycopg[binary]>=3.1   # when the Postgres target exists
+truststore>=0.9     # for any outbound HTTPS: this network does TLS inspection (Cisco Umbrella)
+pytest>=8           # tests only
+# psycopg[binary]>=3.1   # when the Postgres target exists (preflight.py needs it too)

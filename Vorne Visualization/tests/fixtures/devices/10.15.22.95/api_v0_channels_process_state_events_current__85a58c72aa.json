@@ -1,0 +1,37 @@
+{
+ "request": {
+  "path": "api/v0/channels/process_state/events/current",
+  "params": {
+   "fields": "process_state_event_id,sync_id,record_order,production_day_number,start_time,end_time,duration,process_state,process_state_reason,process_state_reason_display_name,performance_impact,production_phase,part,shift"
+  }
+ },
+ "status": 200,
+ "recorded_at": "2026-10-06T13:22:54-0400",
+ "response": {
+  "data": {
+   "events": [
+    [
+     2968,
+     -1,
+     7811000000,
+     20732,
+     "2026-10-06T07:06:54.000000-04:00",
+     "2026-10-06T13:22:53.614372-04:00",
+     22559.614372,
+     "no_production",
+     "Planned_Unscheduled",
+     "Planned Unscheduled",
+     "not_scheduled",
+     "startup",
+     "OTRIVIN",
+     "second_shift"
+    ]
+   ]
+  },
+  "meta": {
+   "asset_id": "18ebfdbc-4202-458e-9589-2770cd4e9de1",
+   "data_version": "1.6",
+   "device_id": "3C:E4:B0:0E:98:E0"
+  }
+ }
+}

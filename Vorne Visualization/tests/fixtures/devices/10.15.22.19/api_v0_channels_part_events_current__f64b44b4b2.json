@@ -1,0 +1,43 @@
+{
+ "request": {
+  "path": "api/v0/channels/part/events/current",
+  "params": {
+   "fields": "part_event_id,sync_id,record_order,production_day_number,start_time,end_time,part,job,duration,run_time,unplanned_stop_time,planned_stop_time,in_count,good_count,ideal_time,ideal_cycle_time,target_count,target_cycles,run_cycles,small_stops"
+  }
+ },
+ "status": 200,
+ "recorded_at": "2026-10-06T13:23:20-0400",
+ "response": {
+  "data": {
+   "events": [
+    [
+     301,
+     -1,
+     11887000000,
+     20728,
+     "2026-10-02T15:28:41.000000-04:00",
+     "2026-10-06T13:23:08.938485-04:00",
+     "ADVIL",
+     "3044146",
+     338067.938485,
+     52783.45394,
+     22981.855961,
+     4485.542429,
+     46066.0,
+     69627.0,
+     24731.454751549998,
+     0.54545455,
+     126275.51650166667,
+     126275.51650166667,
+     45017.0,
+     262.0
+    ]
+   ]
+  },
+  "meta": {
+   "asset_id": "c0fe9f9d-439e-435a-a1c6-36ea56234a7a",
+   "data_version": "1.6",
+   "device_id": "3C:E4:B0:53:9D:EC"
+  }
+ }
+}

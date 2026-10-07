@@ -103,6 +103,11 @@ class DeviceReader:
             return None, None
         return event_id(got[0].get(spec.key)), event_id(got[0].get("production_day_number"))
 
+    def current_record(self, spec: ChannelSpec, fields: list[str]) -> dict[str, Any] | None:
+        """The channel's open event, with every field we load for closed ones."""
+        got = self._events(spec.channel, fields, {}, path="events/current")
+        return got[0] if got else None
+
     def probe_sync_id_filter(self, spec: ChannelSpec) -> bool:
         """Does sync_id[gt] actually filter on this channel?
 

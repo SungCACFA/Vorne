@@ -1,0 +1,42 @@
+{
+ "request": {
+  "path": "api/v0/channels/shift_hour/events/current",
+  "params": {
+   "fields": "shift_hour_event_id,sync_id,record_order,production_day_number,start_time,end_time,shift,shift_hour,part,job,in_count,good_count,reject_count,run_time,unplanned_stop_time,planned_stop_time,not_scheduled_time,ideal_time,target_count"
+  }
+ },
+ "status": 200,
+ "recorded_at": "2026-10-06T13:22:49-0400",
+ "response": {
+  "data": {
+   "events": [
+    [
+     2929,
+     -1,
+     8062000000,
+     20732,
+     "2026-10-06T13:00:00.000000-04:00",
+     "2026-10-06T13:22:48.570752-04:00",
+     "second_shift",
+     "7",
+     "OTRIVIN",
+     "3044066",
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     1368.570752,
+     0.0,
+     0.0,
+     0.0
+    ]
+   ]
+  },
+  "meta": {
+   "asset_id": "0dad8c56-ae7f-421e-b4fe-c40f783b470b",
+   "data_version": "1.6",
+   "device_id": "3C:E4:B0:0F:09:15"
+  }
+ }
+}

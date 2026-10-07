@@ -1,0 +1,21 @@
+{
+ "request": {
+  "path": "rest/cpe/attributes",
+  "params": {}
+ },
+ "status": 200,
+ "recorded_at": "2026-10-06T13:22:42-0400",
+ "response": {
+  "asset_name": "AreaB",
+  "data_version": "1.6",
+  "device_model": "xlhd",
+  "is_bbb": true,
+  "is_hd": true,
+  "locale": "en-CA",
+  "location": "",
+  "origin": "xlpa",
+  "originName": "AreaB",
+  "product_variant": "Gold",
+  "version": "2.22.14.2"
+ }
+}

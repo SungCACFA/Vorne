@@ -1,0 +1,43 @@
+{
+ "request": {
+  "path": "api/v0/channels/job/events/current",
+  "params": {
+   "fields": "job_event_id,sync_id,record_order,production_day_number,start_time,end_time,part,job,duration,run_time,unplanned_stop_time,planned_stop_time,in_count,good_count,ideal_time,ideal_cycle_time,target_count,target_cycles,run_cycles,small_stops"
+  }
+ },
+ "status": 200,
+ "recorded_at": "2026-10-06T13:22:55-0400",
+ "response": {
+  "data": {
+   "events": [
+    [
+     92,
+     -1,
+     7442000000,
+     20732,
+     "2026-10-06T08:49:01.000000-04:00",
+     "2026-10-06T13:22:55.181037-04:00",
+     "ROGAINE_5b_SINGLES",
+     "3044229",
+     16434.181037,
+     0.0,
+     0.0,
+     16434.181037,
+     0.0,
+     0.0,
+     0.0,
+     0.6,
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   ]
+  },
+  "meta": {
+   "asset_id": "b57e2fa5-e747-4d14-9c9a-9c945b37b5a6",
+   "data_version": "1.6",
+   "device_id": "3C:E4:B0:C3:CE:F7"
+  }
+ }
+}

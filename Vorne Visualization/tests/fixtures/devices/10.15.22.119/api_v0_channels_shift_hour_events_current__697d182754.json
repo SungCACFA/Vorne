@@ -1,0 +1,42 @@
+{
+ "request": {
+  "path": "api/v0/channels/shift_hour/events/current",
+  "params": {
+   "fields": "shift_hour_event_id,sync_id,record_order,production_day_number,start_time,end_time,shift,shift_hour,part,job,in_count,good_count,reject_count,run_time,unplanned_stop_time,planned_stop_time,not_scheduled_time,ideal_time,target_count"
+  }
+ },
+ "status": 200,
+ "recorded_at": "2026-10-06T13:22:46-0400",
+ "response": {
+  "data": {
+   "events": [
+    [
+     2983,
+     -1,
+     7447000000,
+     20732,
+     "2026-10-06T13:00:00.000000-04:00",
+     "2026-10-06T13:22:45.236981-04:00",
+     "first_shift",
+     "7",
+     "ROGAINE_5b_SINGLES",
+     "3044229",
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     1365.236981,
+     0.0,
+     0.0,
+     0.0
+    ]
+   ]
+  },
+  "meta": {
+   "asset_id": "b57e2fa5-e747-4d14-9c9a-9c945b37b5a6",
+   "data_version": "1.6",
+   "device_id": "3C:E4:B0:C3:CE:F7"
+  }
+ }
+}

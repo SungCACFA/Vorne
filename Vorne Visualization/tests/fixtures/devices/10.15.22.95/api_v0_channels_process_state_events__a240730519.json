@@ -1,0 +1,35 @@
+{
+ "request": {
+  "path": "api/v0/channels/process_state/events",
+  "params": {
+   "fields": "process_state_event_id,sync_id",
+   "sort": "-sync_id",
+   "limit": "3"
+  }
+ },
+ "status": 200,
+ "recorded_at": "2026-10-06T13:22:50-0400",
+ "response": {
+  "data": {
+   "events": [
+    [
+     2964,
+     11015
+    ],
+    [
+     2966,
+     10999
+    ],
+    [
+     2965,
+     10990
+    ]
+   ]
+  },
+  "meta": {
+   "asset_id": "18ebfdbc-4202-458e-9589-2770cd4e9de1",
+   "data_version": "1.6",
+   "device_id": "3C:E4:B0:0E:98:E0"
+  }
+ }
+}

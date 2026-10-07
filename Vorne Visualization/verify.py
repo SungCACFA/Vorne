@@ -111,6 +111,24 @@ def check_accounting(db, dev_id: str) -> None:
         say(OK, f"{dev_id}: time accounting", detail)
 
 
+def check_negative_durations(db, dev_id: str) -> None:
+    """Events that end before they start, on any fact table with times.
+    Suspected device clock corrections; kept as reported, shown as 0."""
+    found = []
+    for table, key, dur in (("state_event", "process_state_event_id", "duration_s"),
+                            ("part_run", "part_event_id", "duration_s"), ("job_run", "job_event_id", "duration_s"),
+                            ("hour_record", "shift_hour_event_id", None), ("shift_record", "shift_event_id", None)):
+        cond = "end_time < start_time" + (f" OR {dur} < 0" if dur else "")
+        for k, st, en in db.execute(f"SELECT {key}, start_time, end_time FROM {table} WHERE device_id=? "
+                                    f"AND deleted_at IS NULL AND ({cond})", (dev_id,)):
+            found.append(f"{table} {k}: {st[:19]}Z -> {en[:19]}Z")
+    if found:
+        say(FLAG, f"{dev_id}: negative durations", f"{len(found)} event(s) end before they start "
+            "- suspected clock correction:\n" + "\n".join(found))
+    else:
+        say(OK, f"{dev_id}: negative durations", "none")
+
+
 def check_part_job_1to1(db, dev_id: str) -> None:
     """Today every part run has a job run with identical boundaries. That is
     a configuration artefact, not a guarantee: a changeover mid-job breaks
@@ -205,6 +223,7 @@ def main() -> int:
         check_accounting(db, dev["id"])
         check_id_continuity(db, dev, args.offline)
         check_reject_identity(db, dev["id"])
+        check_negative_durations(db, dev["id"])
         check_part_job_1to1(db, dev["id"])
 
     fails = sum(1 for lvl, _ in results if lvl == FAIL)

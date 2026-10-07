@@ -20,12 +20,34 @@
 {% endif %}
 {%- endmacro %}
 
+{% macro left_out(n_s, what='this chart') -%}
+{%- if n_s and n_s[0] -%}<p class="note leftout">{{ n_s[0] }} implausible unplanned stop{{ 's' if n_s[0] != 1 }}
+({{ n_s[1]|hrs }} h) {{ 'are' if n_s[0] != 1 else 'is' }} left out of {{ what }}; see the panel above. The table
+below still includes {{ 'them' if n_s[0] != 1 else 'it' }}.</p>{%- endif -%}
+{%- endmacro %}
+
 {% block title %}{{ dev }} · Danbro packaging{% endblock %}
-{% block sub %}{{ dev }} · {{ win.period_label }}{% endblock %}
+{% block sub %}{{ dev }}{% if part %} · {{ part }}{% endif %} · {{ win.period_label }}{% endblock %}
 
 {% block body %}
+{% if not export and part_options %}
+<form class=partfilter method=get action="{{ request.path }}">
+  <input type=hidden name=g value="{{ win.gran }}">{% if win.period %}<input type=hidden name=p value="{{ win.period }}">{% endif %}
+  {% for w in win.widen %}<input type=hidden name=widen value="{{ w }}">{% endfor %}
+  <label for=part>Product</label>
+  <select id=part name=part onchange="this.form.submit()">
+    <option value=""{% if not part %} selected{% endif %}>All products</option>
+    {% for p in part_options %}<option value="{{ p }}"{% if p == part %} selected{% endif %}>{{ p }}</option>{% endfor %}
+  </select>
+</form>
+{% endif %}
+{% if part %}<p class=msg><strong>Showing {{ part }} only.</strong> Hours whose records name {{ part }} (a changeover
+hour counts for both parts it holds) and the state events the device attributes to it, including any run still open.
+Calendar use here is scheduled ÷ elapsed while {{ part }} was on the line.
+<a class=lnk href="{{ request.path }}{{ win.query() }}">Show all products</a> ·
+<a class=lnk href="{{ url_for('product', part=part) }}{{ win.query() }}">{{ part }} product page</a></p>{% endif %}
 {% if not t.records %}
-<p class=empty>No records for this line in this period.</p>
+<p class=empty>{% if part %}{{ part }} did not run on {{ dev }} in this period.{% else %}No records for this line in this period.{% endif %}</p>
 {% else %}
 {% set down_events = unplanned|sum(attribute='events') %}
 <h2>{{ dev }} at a glance</h2>
@@ -34,6 +56,63 @@
 <td>{{ t.utilization|pc }}</td><td>{{ t.sched|hrs }}</td><td>{{ t.unp|hrs }}</td><td>{{ '{:,}'.format(down_events) }}</td></tr></tbody>
 </table>
 {{ key() }}
+
+{% if implausible %}
+<div class=flag role=note>
+  <p><strong>{{ implausible|length }} state event{{ 's' if implausible|length != 1 }} in this period
+  {{ 'are' if implausible|length != 1 else 'is' }} far too long for what {{ 'they say they are' if implausible|length != 1 else 'it says it is' }}.</strong>
+  A single stop is flagged when it runs over {{ rule.cap_hours|int }} hours, or over {{ rule.floor_hours|int }} hours
+  and more than {{ rule.multiple|int }} times that state's usual length on this line. These look like a parked line
+  left in a stop state, not real maintenance, changeovers or breakdowns:</p>
+  <ul>
+  {% for r in implausible[:8] %}
+    <li><strong>{{ r.state|words }}</strong> from {{ r.start|local }}: {{ r.seconds|hrs }} h
+    {%- if r.times_median %}, {{ '%.0f'|format(r.times_median) }} times the usual {{ (r.median_seconds|mins ~ ' min') if r.median_seconds < 3600 else ((r.median_seconds / 3600)|round(1) ~ ' h') }}{% endif %}
+    {%- if r.reason and r.reason != r.state %} ({{ r.reason }}){% endif %}.</li>
+  {% endfor %}
+  {% if implausible|length > 8 %}<li>and {{ implausible|length - 8 }} more, listed in the data-quality checks.</li>{% endif %}
+  </ul>
+  {% if what_if %}<p>They hold {{ what_if.planned_h|hrs }} h of planned stop{% if what_if.planned_share %}
+  ({{ what_if.planned_share|pc }} of this period's){% endif %}{% if what_if.unplanned_h %} and
+  {{ what_if.unplanned_h|hrs }} h of unplanned stop{% endif %}. Here availability is run ÷ (run + unplanned +
+  planned), so time mislabelled as a stop <em>lowers</em> availability and <em>inflates</em> calendar use. If it was
+  really a parked line, calendar use would be {{ what_if.calendar_if|pc }} rather than {{ what_if.calendar_now|pc }},
+  and availability over all records {{ what_if.avail_if|pc }} rather than {{ what_if.avail_now|pc }}. Nothing on this
+  page has been changed for them; ask the line what really happened.</p>
+  <p><strong>Which availability convention.</strong> Availability on this site counts planned stops in the denominator:
+  run ÷ (run + unplanned + planned), as the project brief defines it. The common OEE convention leaves planned stops
+  out (run ÷ (run + unplanned)), so the same hours read lower here than in a textbook or another plant's figure, and
+  mislabelled stop time moves the two conventions in opposite directions. Compare like with like.</p>{% endif %}
+</div>
+{% endif %}
+
+<h2>Hour by hour</h2>
+<p class=note>Each row is one production day (23:00 to 23:00) and each cell one hour, coloured by what took most of it.
+A row of amber or grey through scheduled hours is a parked line, not a slow one: start with those days. Click a day to
+list its hours in the table at the foot of the page.</p>
+<div class=chart>{{ heatmap }}</div>
+<div class=key><span><i style="background:var(--run)"></i>Running</span>
+<span><i style="background:var(--unp)"></i>Unplanned stop</span>
+<span><i style="background:var(--pln)"></i>Planned stop</span>
+<span><i style="background:var(--nsc)"></i>Not scheduled</span>
+<span><i style="background:var(--panel);outline:1px solid var(--rule)"></i>No state recorded</span>
+{% if part %}<span><i style="background:#fff;outline:1px solid var(--rule)"></i>Another product</span>{% endif %}
+<span>Hairlines mark the shift changes at 07:00 and 15:00.</span></div>
+
+<h2>Run and stop rhythm</h2>
+<p class=note>How long the line runs before it stops, against how long each unplanned stop lasts, week by week. A run
+burst getting shorter is the early warning: availability usually falls a few weeks later, so act when the green line
+drops, not when the headline does.{% if change %} <strong>On this line the run burst stepped
+{{ 'down' if change.shift < 0 else 'up' }} from the week of {{ change.week|weekday_label }}: from
+{{ '%.0f'|format(change.before) }} to {{ '%.0f'|format(change.after) }} minutes ({{ '%+.0f'|format(change.shift * 100) }}%),
+{% if change_stop is none %}while stop length showed no step of its own{% else %}while stop length also stepped,
+from {{ '%.0f'|format(change_stop.before) }} to {{ '%.0f'|format(change_stop.after) }} minutes{% endif %}.
+Something changed on this line at that point; that is the week to ask about.</strong>{% endif %}{% if rhythm_span[2] %} This period is short, so the chart shows the 12 weeks to
+{{ rhythm_span[1]|pday }}.{% endif %}</p>
+<div class=chart>{{ rhythm }}</div>
+{%- if rhythm_excluded and rhythm_excluded[0] %}<p class="note leftout">{{ rhythm_excluded[0] }} implausible
+unplanned stop{{ 's' if rhythm_excluded[0] != 1 }} ({{ rhythm_excluded[1]|hrs }} h) {{ 'are' if rhythm_excluded[0] != 1 else 'is' }}
+left out: one stop left open for a day would otherwise set that week's mean on its own.</p>{% endif %}
 
 <h2>Hours by activity</h2>
 <p class=note>What the line was doing, and whether it counts against availability.</p>
@@ -46,33 +125,69 @@
 {% endfor %}
 </tbody></table>
 
+<h2>Which stops need which owner</h2>
+<p class=note>Each bubble is one unplanned-stop reason: further right means it happens more often, higher means each
+stop lasts longer, and a bigger bubble means more hours lost. Reasons to the right need a process fix the line team
+owns; reasons near the top need maintenance to find the root cause; anything top-right comes first. The two lines are fixed - frequent means more than
+{{ config.CHARTS.frequent_per_day|round(1)|replace('.0', '') }} stop per production day on average, long means over
+{{ config.CHARTS.long_minutes|round(0)|int }} minutes a stop - so a reason changes zone only when its stops change.</p>
+<div class=chart>{{ quadrant }}</div>
+{{ left_out(chart_excluded) }}
+
+<h2>Where the lost hours go</h2>
+<p class=note>Unplanned stop reasons from most hours lost to least, each bar its share of the period's unplanned
+hours, the line the running total.{% if pareto_summary %} {% if pareto_summary.short_list %}<strong>A short list:
+{{ pareto_summary.need }} of {{ pareto_summary.of }} reasons cause {{ pareto_summary.share|pc }} of the lost hours, so
+fixing those few recovers most of it.</strong>{% else %}<strong>No short list: 80% of the lost hours takes
+{{ pareto_summary.need }} of {{ pareto_summary.of }} reasons. No small set of fixes recovers most of this; the losses
+are spread across the line, so expect gains from broad changes - reliability, standard work, staffing - rather than
+from a fix list.</strong>{% endif %}{% endif %}</p>
+<div class=chart>{{ pareto }}</div>
+{{ left_out(chart_excluded) }}
+
 {{ reason_table(unplanned, 'unp', 'Why it stopped',
    'Unplanned stops ranked by hours lost. Many short events point to a nuisance problem; few long ones point to a process or parts problem.') }}
 {{ reason_table(planned, 'pln', 'Planned stops',
    'Changeover, maintenance and setup: planned, but still time the line was not producing.') }}
 
+<h2>What each changeover costs</h2>
+<p class=note>Each row is the part the line was running, each column the part it changed to; the colour is the
+average planned-stop time the change took and the large number how many times it happened. Read along a row to see
+which next part is cheapest to change to, which is what production sequencing should use. The diagonal is a new job
+on the same part. Counted from the last running before the next run to its first running; breakdowns in between and
+any implausible events are left out.</p>
+<div class=chart>{{ comatrix }}</div>
+
 <h2>Availability, production day by production day</h2>
-<p class=note>One bar per production day (starting 07:00). Full height means the line ran for all the time it was scheduled.</p>
+<p class=note>One bar per production day. Full height means the line ran for all the time it was scheduled.</p>
 {{ spark(dev, day_spark) }}
 
-<h2>Hour by hour</h2>
+
+
+<h2 id=hours>Hour by hour, as a table</h2>
 <p class=note>What ran in each scheduled hour, newest first. Performance is ideal time over run time for that hour
 alone. {% if changeovers %}<strong>{{ changeovers }}</strong> hour{{ 's' if changeovers != 1 }} here span a part
 changeover: the device reports every part (and job) that ran in the hour, shown separated by a slash in the order
 the device lists them.{% endif %}
-{% if bad_perf %}<strong class=bad>{{ bad_perf }}</strong> hour{{ 's' if bad_perf != 1 }} show performance above 100%,
-which means the ideal cycle time configured for that part is wrong, not that the machine ran fast.{% endif %}</p>
+{% if bad_perf %}<strong class=bad>{{ bad_perf }}</strong> hour{{ 's' if bad_perf != 1 }} show performance above 100%.
+Over 100% means the ideal cycle time configured for that part is wrong, not that the machine ran fast{% if bad_perf_short %};
+{{ bad_perf_short }} of these ran under five minutes, where rounding on a single cycle can tip it over, and are marked
+as such{% endif %}.{% endif %}</p>
+<p class=filterbar hidden>Showing <strong data-filter-label></strong> only.
+<button type=button data-filter-clear>Show all days</button></p>
 <div class=scroll><table class=hours><thead><tr><th>Production day</th><td>Hour</td><td>Shift</td><td>Part</td><td>Job</td>
 <td>Run min</td><td>Down min</td><td>Planned min</td><td>Perf</td></tr></thead>
 <tbody>
-{% for h in hours[:500] %}
-<tr{% if h.part and ',' in h.part %} class=changeover{% endif %}><th>{{ h.day|pday }}</th>
+{% for h in hours %}
+{%- set cls = (['changeover'] if h.part and ',' in h.part else []) + (['beyond'] if loop.index > 500 else []) %}
+<tr data-day="{{ h.day|isoday }}"{% if cls %} class="{{ cls|join(' ') }}"{% endif %}><th>{{ h.day|pday }}</th>
 <td>{{ h.start|clock }}–{{ h.end|clock }}{% if not h.full %} <small class=muted title="Partial record: not a full hour">partial</small>{% endif %}</td>
-<td>{{ h.shift|multi('shift change') }}</td><td>{{ h.part|multi }}</td><td>{{ h.job|multi }}</td>
-<td>{{ h.run|mins }}</td><td>{{ h.unp|mins }}</td><td>{{ h.pln|mins }}</td><td>{{ perf(h.performance) }}</td></tr>
+<td>{{ h.shift|multi('shift change') }}</td><td>{{ h.part|parts }}</td><td>{{ h.job|multi }}</td>
+<td>{{ h.run|mins }}</td><td>{{ h.unp|mins }}</td><td>{{ h.pln|mins }}</td><td>{{ perf(h.performance, h.run) }}</td></tr>
 {% endfor %}
 </tbody></table></div>
-{% if hours|length > 500 %}<p class=note>Showing the newest 500 of {{ '{:,}'.format(hours|length) }} scheduled hours. Pick a shorter period to see the rest.</p>{% endif %}
+{% if hours|length > 500 %}<p class=note data-beyond-note>Showing the newest 500 of {{ '{:,}'.format(hours|length) }} scheduled hours.
+Click a day on the heatmap to list any day's hours, or pick a shorter period.</p>{% endif %}
 {% endif %}
 
 {{ counts_flag() }}
@@ -80,7 +195,7 @@ which means the ideal cycle time configured for that part is wrong, not that the
 
 {% block footer %}
 {{ methodology(snap, [dev]) }}
-<p>Calendar use is not the earlier report's "Utilised"; see the overview footer. Production days start at 07:00.
+<p>Calendar use is not the earlier report's "Utilised"; see the overview footer. A production day starts with its first shift: 23:00 the evening before when a third shift runs, otherwise 07:00. An unscheduled night stays with the day before.
 Activity and stop hours come from the device's own state records, so they cover whole state events and can
 differ slightly from the hour-record totals at the edges of a period.</p>
 {% endblock %}

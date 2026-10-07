@@ -1,0 +1,247 @@
+{
+ "request": {
+  "path": "api/v0/channels/process_state/events",
+  "params": {
+   "fields": "process_state_event_id,sync_id,record_order,production_day_number,start_time,end_time,duration,process_state,process_state_reason,process_state_reason_display_name,performance_impact,production_phase,part,shift",
+   "sort": "record_order",
+   "limit": "1000",
+   "production_day_number[gte]": "20725"
+  }
+ },
+ "status": 200,
+ "recorded_at": "2026-10-06T13:22:52-0400",
+ "response": {
+  "data": {
+   "events": [
+    [
+     2779,
+     9696,
+     7257000000,
+     20725,
+     "2026-09-29T07:00:00.000000-04:00",
+     "2026-09-30T07:00:35.000000-04:00",
+     24991.0,
+     "down",
+     "PWO_Not_Ready",
+     "PWO Not Ready",
+     "unplanned_stop",
+     "startup",
+     "ROGAINE_5b_4FOR3",
+     "first_shift"
+    ],
+    [
+     2785,
+     9649,
+     7265000000,
+     20725,
+     "2026-09-29T13:55:56.000000-04:00",
+     "2026-09-29T23:00:00.000000-04:00",
+     32644.0,
+     "no_production",
+     "Planned_Unscheduled",
+     "Planned Unscheduled",
+     "not_scheduled",
+     "startup",
+     "ROGAINE_5b_4FOR3",
+     [
+      "first_shift",
+      "second_shift"
+     ]
+    ],
+    [
+     2786,
+     9658,
+     7275000000,
+     20725,
+     "2026-09-29T23:00:00.000000-04:00",
+     "2026-09-30T07:00:00.000000-04:00",
+     28800.0,
+     "no_production",
+     "no_production",
+     "No Shift Scheduled",
+     "not_scheduled",
+     "startup",
+     "ROGAINE_5b_4FOR3",
+     "null"
+    ],
+    [
+     2788,
+     9676,
+     7285000000,
+     20726,
+     "2026-09-30T07:00:35.000000-04:00",
+     "2026-09-30T23:00:00.000000-04:00",
+     57565.0,
+     "no_production",
+     "Planned_Unscheduled",
+     "Planned Unscheduled",
+     "not_scheduled",
+     "startup",
+     "ROGAINE_5b_4FOR3",
+     [
+      "first_shift",
+      "second_shift"
+     ]
+    ],
+    [
+     2789,
+     9685,
+     7301000000,
+     20726,
+     "2026-09-30T23:00:00.000000-04:00",
+     "2026-10-01T07:00:00.000000-04:00",
+     28800.0,
+     "no_production",
+     "no_production",
+     "No Shift Scheduled",
+     "not_scheduled",
+     "startup",
+     "ROGAINE_5b_4FOR3",
+     "null"
+    ],
+    [
+     2791,
+     9835,
+     7310000000,
+     20727,
+     "2026-10-01T07:00:00.000000-04:00",
+     "2026-10-06T08:02:00.000000-04:00",
+     62416.0,
+     "down",
+     "Waiting_j_Components",
+     "Waiting - Components",
+     "unplanned_stop",
+     "startup",
+     "ROGAINE_5b_4FOR3",
+     [
+      "first_shift",
+      "second_shift"
+     ]
+    ],
+    [
+     2792,
+     9715,
+     7312000000,
+     20727,
+     "2026-10-01T07:10:04.000000-04:00",
+     "2026-10-01T23:00:00.000000-04:00",
+     56996.0,
+     "no_production",
+     "Planned_Unscheduled",
+     "Planned Unscheduled",
+     "not_scheduled",
+     "startup",
+     "ROGAINE_5b_4FOR3",
+     [
+      "first_shift",
+      "second_shift"
+     ]
+    ],
+    [
+     2793,
+     9724,
+     7328000000,
+     20727,
+     "2026-10-01T23:00:00.000000-04:00",
+     "2026-10-02T07:00:00.000000-04:00",
+     28800.0,
+     "no_production",
+     "no_production",
+     "No Shift Scheduled",
+     "not_scheduled",
+     "startup",
+     "ROGAINE_5b_4FOR3",
+     "null"
+    ],
+    [
+     2795,
+     9743,
+     7339000000,
+     20728,
+     "2026-10-02T07:08:12.000000-04:00",
+     "2026-10-02T23:00:00.000000-04:00",
+     57108.0,
+     "no_production",
+     "Planned_Unscheduled",
+     "Planned Unscheduled",
+     "not_scheduled",
+     "startup",
+     "ROGAINE_5b_4FOR3",
+     [
+      "first_shift",
+      "second_shift"
+     ]
+    ],
+    [
+     2796,
+     9800,
+     7355000000,
+     20728,
+     "2026-10-02T23:00:00.000000-04:00",
+     "2026-10-05T07:00:00.000000-04:00",
+     201600.0,
+     "no_production",
+     "no_production",
+     "No Shift Scheduled",
+     "not_scheduled",
+     "startup",
+     "ROGAINE_5b_4FOR3",
+     "null"
+    ],
+    [
+     2798,
+     9831,
+     7429000000,
+     20731,
+     "2026-10-05T23:00:00.000000-04:00",
+     "2026-10-06T07:00:00.000000-04:00",
+     28800.0,
+     "no_production",
+     "no_production",
+     "No Shift Scheduled",
+     "not_scheduled",
+     "startup",
+     "ROGAINE_5b_4FOR3",
+     "null"
+    ],
+    [
+     2800,
+     9837,
+     7441000000,
+     20732,
+     "2026-10-06T08:02:00.000000-04:00",
+     "2026-10-06T08:49:01.000000-04:00",
+     2821.0,
+     "changeover",
+     "Setup",
+     "Setup",
+     "planned_stop",
+     "changeover",
+     "ROGAINE_5b_SINGLES",
+     "first_shift"
+    ],
+    [
+     2801,
+     -1,
+     7442000000,
+     20732,
+     "2026-10-06T08:49:01.000000-04:00",
+     "2026-10-06T13:22:50.163151-04:00",
+     16429.163151,
+     "changeover",
+     "Setup",
+     "Setup",
+     "planned_stop",
+     "startup",
+     "ROGAINE_5b_SINGLES",
+     "first_shift"
+    ]
+   ]
+  },
+  "meta": {
+   "asset_id": "b57e2fa5-e747-4d14-9c9a-9c945b37b5a6",
+   "data_version": "1.6",
+   "device_id": "3C:E4:B0:C3:CE:F7"
+  }
+ }
+}

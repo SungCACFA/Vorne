@@ -1,0 +1,119 @@
+{
+ "request": {
+  "path": "api/v0/channels/quality_event",
+  "params": {}
+ },
+ "status": 200,
+ "recorded_at": "2026-10-06T13:23:23-0400",
+ "response": {
+  "data": {
+   "fields": [
+    {
+     "display_name": "term.reject_reason_display_name.name",
+     "help_text": "term.reject_reason_display_name.short",
+     "name": "reject_reason_display_name",
+     "scoreboard_name": "term.reject_reason_display_name.scoreboard_name",
+     "subtype": "annotation",
+     "type": "string"
+    },
+    {
+     "classification": "counts",
+     "display_name": "term.count.name",
+     "help_text": "term.count.short",
+     "name": "count",
+     "rollup": true,
+     "scoreboard_name": "term.count.scoreboard_name",
+     "subtype": "count",
+     "type": "double"
+    },
+    {
+     "display_name": "term.event_id.name",
+     "help_text": "term.event_id.short",
+     "indexed": true,
+     "internal": true,
+     "name": "event_id",
+     "persist": true,
+     "rollup": true,
+     "scoreboard_name": "term.event_id.scoreboard_name",
+     "type": "id"
+    },
+    {
+     "aggregation": "none",
+     "display_name": "term.production_day_number.name",
+     "help_text": "term.production_day_number.short",
+     "internal": true,
+     "name": "production_day_number",
+     "persist": true,
+     "rollup": true,
+     "scoreboard_name": "term.production_day_number.scoreboard_name",
+     "type": "uint64"
+    },
+    {
+     "aggregation": "max",
+     "display_name": "term.record_id.name",
+     "help_text": "term.record_id.short",
+     "name": "record_id",
+     "persist": true,
+     "rollup": true,
+     "scoreboard_name": "term.record_id.scoreboard_name",
+     "type": "id"
+    },
+    {
+     "aggregation": "min",
+     "display_name": "term.record_order.name",
+     "help_text": "term.record_order.short",
+     "indexed": true,
+     "internal": true,
+     "name": "record_order",
+     "persist": true,
+     "rollup": true,
+     "scoreboard_name": "term.record_order.scoreboard_name",
+     "type": "id"
+    },
+    {
+     "display_name": "term.slice_order.name",
+     "help_text": "term.slice_order.short",
+     "indexed": true,
+     "internal": true,
+     "name": "slice_order",
+     "persist": true,
+     "reference": true,
+     "rollup": true,
+     "scoreboard_name": "term.slice_order.scoreboard_name",
+     "type": "id"
+    },
+    {
+     "aggregation": "sync_id",
+     "display_name": "term.sync_id.name",
+     "help_text": "term.sync_id.short",
+     "indexed": true,
+     "internal": true,
+     "name": "sync_id",
+     "rollup": true,
+     "scoreboard_name": "term.sync_id.scoreboard_name",
+     "type": "id"
+    },
+    {
+     "category": "reject_reason",
+     "display_name": "term.reject_reason.name",
+     "help_text": "term.reject_reason.short",
+     "indexed": true,
+     "indexed_with": [
+      "record_order"
+     ],
+     "name": "reject_reason",
+     "persist": true,
+     "rollup": true,
+     "scoreboard_name": "term.reject_reason.scoreboard_name",
+     "subtype": "category_value",
+     "type": "string"
+    }
+   ]
+  },
+  "meta": {
+   "asset_id": "c0fe9f9d-439e-435a-a1c6-36ea56234a7a",
+   "data_version": "1.6",
+   "device_id": "3C:E4:B0:53:9D:EC"
+  }
+ }
+}

@@ -4,6 +4,8 @@
   </div>
   {# Sent only when the period or a widen box changes, so a granularity button wins. #}
   <input type=hidden name=g value="{{ win.gran }}" disabled id=gkeep>
+  {% if unit is defined %}<input type=hidden name=u value="{{ unit }}">{% endif %}
+  {% if part is defined and part and page != 'products' %}<input type=hidden name=part value="{{ part }}">{% endif %}
   <label class=sr for=period>Period</label>
   <select id=period name=p onchange="document.getElementById('gkeep').disabled=false;this.form.submit()">
     {% for k, l in win.periods %}<option value="{{ k }}"{% if k == win.period %} selected{% endif %}>{{ l }}</option>{% endfor %}

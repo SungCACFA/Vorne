@@ -26,7 +26,7 @@ That reconciliation is what makes the rates below dependable.</p>
 {{ key() }}
 
 <h2>Availability, production day by production day</h2>
-<p class=note>One bar per production day (starting 07:00). Full height means the line ran for all the time it was
+<p class=note>One bar per production day. Full height means the line ran for all the time it was
 scheduled. A day with nothing scheduled shows as a stub.</p>
 {% for dev in snap.devices if dev in sparks %}{{ spark(dev, sparks[dev]) }}{% endfor %}
 {% endif %}
@@ -41,6 +41,6 @@ computed from full hours only, which dropped the overnight not-scheduled blocks,
 remaining time was scheduled rather than how much of the calendar was.
 {% if rows %}For {{ win.period_label }}, calendar use is {{ fleet.utilization|pc }}; the old method gives
 {{ fleet.utilization_full_hours_only|pc }}.{% endif %}</p>
-<p>Production days start at 07:00 and are labelled as production days, not calendar dates.
+<p>Production days are not calendar dates. A production day starts with its first shift: 23:00 the evening before when a third shift runs, otherwise 07:00. An unscheduled night stays with the day before.
 Piece counts are excluded; see the note above.</p>
 {% endblock %}

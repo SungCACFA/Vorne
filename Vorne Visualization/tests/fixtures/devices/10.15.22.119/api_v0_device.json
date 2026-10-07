@@ -1,0 +1,85 @@
+{
+ "request": {
+  "path": "api/v0/device",
+  "params": {}
+ },
+ "status": 200,
+ "recorded_at": "2026-10-06T13:22:42-0400",
+ "response": {
+  "data": {
+   "asset_name": {
+    "metadata": {
+     "name_key": "asset_name_literal",
+     "type": "string"
+    },
+    "value": "AreaE"
+   },
+   "device_id": {
+    "metadata": {
+     "name_key": "device_id_literal",
+     "type": "string"
+    },
+    "value": "3C:E4:B0:C3:CE:F7"
+   },
+   "domain_name": {
+    "metadata": {
+     "name_key": "domain_name_literal"
+    },
+    "value": ""
+   },
+   "firmware_version": {
+    "metadata": {
+     "name_key": "firmware_version_literal",
+     "type": "string"
+    },
+    "value": "2.22.14.2"
+   },
+   "ip_address": {
+    "metadata": {
+     "name_key": "ip_address_literal"
+    },
+    "value": "10.15.22.119"
+   },
+   "keypad_action": {
+    "metadata": {
+     "name_key": "keypad_action_literal",
+     "type": "string"
+    },
+    "value": ""
+   },
+   "keypad_entry": {
+    "metadata": {
+     "name_key": "keypad_entry_literal",
+     "type": "uint32"
+    },
+    "value": null
+   },
+   "serial_unrecognized_count": {
+    "metadata": {
+     "name_key": "serial_unrecognized_count_literal",
+     "type": "uint32"
+    },
+    "value": 0
+   },
+   "serial_unrecognized_raw": {
+    "metadata": {
+     "name_key": "serial_unrecognized_raw_literal",
+     "type": "string"
+    },
+    "value": ""
+   },
+   "time": {
+    "metadata": {
+     "name_key": "time_literal",
+     "type": "date_time"
+    },
+    "value": "2026-10-06T13:22:41-04:00"
+   }
+  },
+  "meta": {
+   "asset_id": "b57e2fa5-e747-4d14-9c9a-9c945b37b5a6",
+   "data_version": "1.6",
+   "device_id": "3C:E4:B0:C3:CE:F7"
+  }
+ }
+}

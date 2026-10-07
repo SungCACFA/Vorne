@@ -1,0 +1,37 @@
+{
+ "request": {
+  "path": "api/v0/channels/process_state/events/current",
+  "params": {
+   "fields": "process_state_event_id,sync_id,record_order,production_day_number,start_time,end_time,duration,process_state,process_state_reason,process_state_reason_display_name,performance_impact,production_phase,part,shift"
+  }
+ },
+ "status": 200,
+ "recorded_at": "2026-10-06T13:23:17-0400",
+ "response": {
+  "data": {
+   "events": [
+    [
+     5539,
+     -1,
+     12115000000,
+     20732,
+     "2026-10-06T11:58:14.103165-04:00",
+     "2026-10-06T13:23:03.899715-04:00",
+     2989.79655,
+     "down",
+     "Tube_Feeding",
+     "Tube Feeding",
+     "unplanned_stop",
+     "startup",
+     "ADVIL",
+     "first_shift"
+    ]
+   ]
+  },
+  "meta": {
+   "asset_id": "c0fe9f9d-439e-435a-a1c6-36ea56234a7a",
+   "data_version": "1.6",
+   "device_id": "3C:E4:B0:53:9D:EC"
+  }
+ }
+}

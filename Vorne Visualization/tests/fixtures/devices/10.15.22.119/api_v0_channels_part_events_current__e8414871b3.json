@@ -1,0 +1,25 @@
+{
+ "request": {
+  "path": "api/v0/channels/part/events/current",
+  "params": {
+   "fields": "part_event_id,production_day_number"
+  }
+ },
+ "status": 200,
+ "recorded_at": "2026-10-06T13:22:53-0400",
+ "response": {
+  "data": {
+   "events": [
+    [
+     92,
+     20732
+    ]
+   ]
+  },
+  "meta": {
+   "asset_id": "b57e2fa5-e747-4d14-9c9a-9c945b37b5a6",
+   "data_version": "1.6",
+   "device_id": "3C:E4:B0:C3:CE:F7"
+  }
+ }
+}

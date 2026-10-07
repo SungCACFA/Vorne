@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% from "_macros.html" import perf, counts_flag, methodology %}
+
+{% block title %}{{ part }} · Danbro packaging{% endblock %}
+{% block sub %}{{ part }} · {{ win.period_label }}{% endblock %}
+
+{% block body %}
+<h2>{{ part }}</h2>
+<p class=note>One product, every line that ran it. Figures cover the closed runs of {{ part }} that started in this
+period; a run still open is listed but counted nowhere until it closes. <a class=lnk href="{{ url_for('products') }}{{ win.query() }}">All products</a></p>
+{% for o in open_here %}<p class=msg><span class="badge{{ '' if o.reasons else ' mild' }}">open</span> A run of {{ part }} on
+{{ o.device_id }} has been open since {{ o.start|local }} ({{ o.run_seconds|hrs }} run h so far){{ ': ' ~ o.reasons|join('; ') if o.reasons }}.
+It is in none of the figures below.</p>{% endfor %}
+
+{% if not lines %}
+<p class=empty>No closed run of {{ part }} started in this period.{% if last_ran %} It last ran on {{ last_ran[0] }}
+on production day {{ last_ran[1]|pday }}.{% endif %}</p>
+{% else %}
+
+<h2>Where it runs</h2>
+<p class=note>How {{ part }} does on each line. Down h per run h is unplanned stop hours for every hour the line was
+cycling: the fair figure across products, since it does not depend on how long a run was. Available is run ÷ (run +
+down + planned) within its runs, the site's convention (planned stops count against it).{% if any_excluded %}
+Down hours here are the device's own, implausible stops included; the charts below leave them out.{% endif %}</p>
+<table><thead><tr><th>Line</th><td>Runs</td><td>Run h</td><td>Down h</td><td>Down h<small class=f>per run h</small></td>
+<td>Planned h</td><td>Available<small class=f>within its runs</small></td><td>Performance<small class=f>ideal ÷ run</small></td>
+<td title="median ideal_time ÷ run_cycles, runs over 200 cycles, the current configuration level">ICT now<small class=f>s per cycle</small></td></tr></thead>
+<tbody>
+{% for l in lines %}
+<tr><th><a class=lnk href="{{ url_for('line', dev=l.dev) }}{{ win.query(part=part) }}">{{ l.dev }}</a></th>
+<td>{{ l.runs|length }}</td><td>{{ l.run_s|hrs }}</td><td>{{ l.unp_s|hrs }}</td>
+<td>{{ '%.2f'|format(l.unp_s / l.run_s) if l.run_s else '—' }}</td><td>{{ l.pln_s|hrs }}</td>
+<td>{{ (l.run_s / (l.run_s + l.unp_s + l.pln_s))|pc if l.run_s + l.unp_s + l.pln_s else '—' }}</td>
+<td>{{ perf(l.ideal_s / l.run_s if l.run_s else none) }}</td>
+<td>{% if l.ict_levels.levels %}{{ '%.3f'|format(l.ict_levels.levels[-1].value) }}{% if l.ict_levels.changes %}
+<small class=warn>reconfigured</small>{% endif %}{% else %}<span class=state>no run over 200 cycles</span>{% endif %}</td></tr>
+{% endfor %}
+</tbody></table>
+
+<h2>Every run</h2>
+<p class=note>One dot per run, at the time it started, on a panel per line: higher means more down time for each
+hour it ran, a bigger dot a longer run. Dots drifting up over the period mean the product is getting harder to run;
+check the ideal cycle time chart below for a reconfiguration at the same point before blaming the line. Small dots
+far above the dashed line are short runs, where one stop dominates: read the big dots.</p>
+<div class=chart>{{ timeline }}</div>
+{%- set idle = lines|map(attribute='runs')|sum(start=[])|selectattr('run_s', 'equalto', 0)|list %}
+{%- if idle %}<p class=note>{{ idle|length }} run{{ 's' if idle|length != 1 }} never cycled (no run hours), so
+{{ 'have' if idle|length != 1 else 'has' }} no dot: usually a part selected and changed again straight away. Their
+{{ idle|sum(attribute='unp_s')|hrs }} down h and {{ idle|sum(attribute='pln_s')|hrs }} planned h still count in the
+table above.</p>{% endif %}
+{%- if excluded[0] %}<p class="note leftout">{{ excluded[0] }} implausible unplanned stop{{ 's' if excluded[0] != 1 }}
+({{ excluded[1]|hrs }} h) inside these runs {{ 'are' if excluded[0] != 1 else 'is' }} left out of the charts on this
+page; the table above still includes {{ 'them' if excluded[0] != 1 else 'it' }}.</p>{% endif %}
+
+<h2>Against the line's other products</h2>
+<p class=note>Down hours per run hour for every part each line ran in this period, {{ part }} highlighted. Same
+machine, same crew, same stop reasons, so a gap here is the product, not the line. A part well above its line-mates
+is the one to look at for material, format or setup problems; click another part to open its page. Parts with under
+one run hour in the period are left out: one stop would set their figure.</p>
+{% for l in lines %}<h3>{{ l.dev }}</h3><div class=chart>{{ l.compare }}</div>{% endfor %}
+
+<h2>Why it stops</h2>
+<p class=note>Unplanned stop reasons while {{ part }} was running, most hours lost first, each bar its share and the
+line the running total. A reason far bigger here than on the line page as a whole is specific to this product.</p>
+{% for l in lines %}<h3>{{ l.dev }}</h3>
+{% if l.pareto_summary %}<p class=note><strong>{% if l.pareto_summary.short_list %}A short list:
+{{ l.pareto_summary.need }} of {{ l.pareto_summary.of }} reasons cause {{ l.pareto_summary.share|pc }} of the lost
+hours, so fixing those few recovers most of it.{% else %}No short list: 80% of the lost hours takes
+{{ l.pareto_summary.need }} of {{ l.pareto_summary.of }} reasons. No small set of fixes recovers most of this.{% endif %}</strong></p>{% endif %}
+<div class=chart>{{ l.pareto }}</div>{% endfor %}
+
+<h2>Ideal cycle time, run by run</h2>
+<p class=note>Ideal time ÷ run cycles for each run over 200 cycles. On an unchanged configuration this barely moves,
+so a step is someone changing the part's ideal cycle time on the XL, and every performance figure either side of it
+is measured against a different standard. Ask who changed it and which value is right.
+{% for l in lines %}{% for c in l.ict_levels.changes %}<strong>{{ l.dev }}: reconfigured on
+{{ c.start|local }}, {{ '%.3f'|format(c.before) }} to {{ '%.3f'|format(c.after) }} s per cycle
+({{ '%+.0f'|format(c.shift * 100) }}%){% if not c.in_period %}, before this period{% endif %}.</strong> {% endfor %}{% endfor %}
+{% if mixed %}The derived ideal cycle time on the products page is the median over all history, so where a line was
+reconfigured it mixes both values; the current level is the one in the table above.{% endif %}</p>
+<div class=chart>{{ ict }}</div>
+
+<h2>What changing to and from it costs</h2>
+<p class=note>Planned-stop hours for each change into {{ part }} (by the part before it) and out of it (by the part
+after), from the last running of one run to the first running of the next; breakdowns in between and implausible
+events are left out. A predecessor much cheaper than the others is the one to schedule ahead of {{ part }}.</p>
+{% for l in lines %}<h3>{{ l.dev }}</h3>{{ l.inout }}{% endfor %}
+{% endif %}
+
+{{ counts_flag() }}
+{% endblock %}
+
+{% block footer %}
+{{ methodology(snap, lines|map(attribute='dev')|list or snap.devices) }}
+<p>A run is the device's own part run, from one part starting to the next. Stops are assigned to the run they
+started in. Down h = unplanned stop.</p>
+{% endblock %}

@@ -1,0 +1,35 @@
+{
+ "request": {
+  "path": "api/v0/channels/job/events",
+  "params": {
+   "fields": "job_event_id,sync_id",
+   "sort": "-sync_id",
+   "limit": "3"
+  }
+ },
+ "status": 200,
+ "recorded_at": "2026-10-06T13:23:21-0400",
+ "response": {
+  "data": {
+   "events": [
+    [
+     291,
+     17005
+    ],
+    [
+     300,
+     16999
+    ],
+    [
+     299,
+     16971
+    ]
+   ]
+  },
+  "meta": {
+   "asset_id": "c0fe9f9d-439e-435a-a1c6-36ea56234a7a",
+   "data_version": "1.6",
+   "device_id": "3C:E4:B0:53:9D:EC"
+  }
+ }
+}

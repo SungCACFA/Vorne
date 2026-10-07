@@ -36,7 +36,7 @@ from .channels import SPECS, ChannelSpec
 from .client import DeviceHTTPError, XLClient
 from .metrics import event_id
 from .reader import ChannelUnusable, DeviceReader
-from .rows import MALFORMED, OK, OPEN, build_row
+from .rows import MALFORMED, OK, OPEN, build_row, convert
 from .store import Heartbeat, QuarantineItem, RowRejected, Store, StoreError, SystemicError, TransportError
 
 log = logging.getLogger(__name__)
@@ -209,6 +209,12 @@ class ChannelSync:
                     log.warning("[%s] %s: flagged %d row(s) deleted on the device: %s",
                                 self.device_id, spec.channel, r.flagged_deleted, sorted(gone)[:10])
                 state.last_window_from_day = from_day
+
+            # The open event itself: never a fact, but the app needs to see it.
+            if spec.has_end_time:
+                current = self.reader.current_record(spec, fields)
+                row = convert(spec, self.device_id, current)[0] if current else None
+                self.store.record_open_event(spec, self.device_id, row)
 
             state.last_success_at = _now().isoformat()
             state.last_error = None

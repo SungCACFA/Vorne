@@ -5,14 +5,32 @@
 <link rel=stylesheet href="{{ url_for('static', filename='style.css') }}">
 <div class=wrap>
 <h1>Danbro packaging</h1>
-<p class=sub>{% block sub %}{% endblock %}</p>
+<p class=sub><!--sub-->{% block sub %}{% endblock %}<!--/sub--></p>
 <nav>
   <a href="{{ url_for('overview') }}{{ win.query() }}"{% if page == 'overview' %} aria-current=page{% endif %}>Overview</a>
   {% for d in snap.devices %}<a href="{{ url_for('line', dev=d) }}{{ win.query() }}"{% if page == d %} aria-current=page{% endif %}>{{ d }}</a>{% endfor %}
+  <a href="{{ url_for('products') }}{{ win.query() }}"{% if page == 'products' %} aria-current=page{% endif %}>Products</a>
 </nav>
+<!--head-->{% include "_alerts.html" %}<!--/head-->
 {% include "_controls.html" %}
-{% include "_exclusion.html" %}
-{% block body %}{% endblock %}
-<footer>{% block footer %}{% endblock %}</footer>
+<!--panel-->{% include "_exclusion.html" %}<!--/panel-->
+<!--body-->{% block body %}{% endblock %}<!--/body-->
+<script>
+document.addEventListener('click', ev => {
+  const row = ev.target.closest('[data-filter-day]'), clear = ev.target.closest('[data-filter-clear]');
+  if (!row && !clear) return;
+  ev.preventDefault(); ev.stopPropagation();
+  const day = row ? row.dataset.filterDay : null;
+  const table = document.querySelector('table.hours'), bar = document.querySelector('.filterbar');
+  if (!table || !bar) return;
+  let n = 0;
+  table.classList.toggle('filtered', !!day);
+  for (const tr of table.tBodies[0].rows) { const m = !!day && tr.dataset.day === day; tr.classList.toggle('match', m); n += m; }
+  bar.hidden = !day;
+  if (day) { bar.querySelector('[data-filter-label]').textContent = day + ' (' + n + ' scheduled hour' + (n === 1 ? '' : 's') + ')';
+             document.getElementById('hours').scrollIntoView({behavior: 'smooth'}); }
+}, true);
+</script>
+<footer><!--foot-->{% block footer %}{% endblock %}<!--/foot--></footer>
 </div>
 </html>

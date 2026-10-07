@@ -1,0 +1,43 @@
+{
+ "request": {
+  "path": "api/v0/channels/part/events/current",
+  "params": {
+   "fields": "part_event_id,sync_id,record_order,production_day_number,start_time,end_time,part,job,duration,run_time,unplanned_stop_time,planned_stop_time,in_count,good_count,ideal_time,ideal_cycle_time,target_count,target_cycles,run_cycles,small_stops"
+  }
+ },
+ "status": 200,
+ "recorded_at": "2026-10-06T13:22:56-0400",
+ "response": {
+  "data": {
+   "events": [
+    [
+     79,
+     -1,
+     6258000000,
+     20690,
+     "2026-08-25T09:47:38.000000-04:00",
+     "2026-10-06T13:22:53.614372-04:00",
+     "OTRIVIN",
+     "3043984",
+     3641715.614372,
+     364605.938565,
+     304041.593475,
+     468126.074756,
+     133113.0,
+     127122.0,
+     264257.8153213933,
+     2.14285714,
+     289746.79860808654,
+     289746.79860808654,
+     122094.31398107688,
+     1012.0
+    ]
+   ]
+  },
+  "meta": {
+   "asset_id": "18ebfdbc-4202-458e-9589-2770cd4e9de1",
+   "data_version": "1.6",
+   "device_id": "3C:E4:B0:0E:98:E0"
+  }
+ }
+}

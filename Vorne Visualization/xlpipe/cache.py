@@ -87,6 +87,34 @@ CREATE TABLE IF NOT EXISTS sync_heartbeat (
     devices_ok INTEGER, devices_total INTEGER, rows_upserted INTEGER, last_error TEXT,
     detail TEXT
 );
+-- Each channel's currently open event, replaced on every refresh. Open
+-- events are never loaded as facts; this is what lets the app mark them and
+-- warn when one has been open far too long (AreaD, August 2026).
+CREATE TABLE IF NOT EXISTS open_event (
+    device_id TEXT NOT NULL, channel TEXT NOT NULL, event_key INTEGER,
+    start_time TEXT, part TEXT, job TEXT, production_day_number INTEGER,
+    run_time REAL, row_json TEXT NOT NULL, captured_at TEXT NOT NULL,
+    PRIMARY KEY (device_id, channel)
+);
+-- Same shape as schema.sql part_standard. The derived columns are written by
+-- refresh_part_standard(); sap_* and expected_count_per_cycle only by the app.
+-- These are hand-entered values: deleting the cache file deletes them, so
+-- export the CSV from the products page before any rebuild.
+CREATE TABLE IF NOT EXISTS part_standard (
+    part TEXT PRIMARY KEY,
+    ideal_cycle_time REAL, ict_stddev REAL, sample_runs INTEGER,
+    ict_unstable INTEGER GENERATED ALWAYS AS (ict_stddev > 0.05) STORED,
+    ict_updated_at TEXT,
+    sap_standard REAL,
+    sap_unit TEXT CHECK (sap_unit IN ('s_per_piece', 'pieces_per_hour', 'hours_per_thousand')),
+    sap_s_per_piece REAL GENERATED ALWAYS AS (
+        CASE sap_unit WHEN 's_per_piece' THEN sap_standard
+                      WHEN 'pieces_per_hour' THEN 3600.0 / NULLIF(sap_standard, 0)
+                      WHEN 'hours_per_thousand' THEN sap_standard * 3.6 END) STORED,
+    sap_updated_at TEXT, sap_updated_by TEXT,
+    expected_count_per_cycle REAL, epc_updated_at TEXT, epc_updated_by TEXT,
+    updated_at TEXT NOT NULL
+);
 -- Not in schema.sql: what each channel's field schema actually offered,
 -- so drift between devices or firmware is queryable.
 CREATE TABLE IF NOT EXISTS channel_field (
@@ -270,6 +298,47 @@ class SQLiteCache:
                 "UPDATE sync_quarantine SET resolved_at = ? WHERE device_id = ? AND channel = ? "
                 "AND natural_key = ? AND resolved_at IS NULL",
                 [(now, device_id, channel, k) for k in keys])
+
+    # ------------------------------------------------------- open events
+
+    def record_open_event(self, spec: ChannelSpec, device_id: str, row: dict[str, Any] | None) -> None:
+        with self._lock:
+            if row is None:
+                self.db.execute("DELETE FROM open_event WHERE device_id=? AND channel=?", (device_id, spec.channel))
+                return
+            self.db.execute(
+                "INSERT OR REPLACE INTO open_event VALUES (?,?,?,?,?,?,?,?,?,?)",
+                (device_id, spec.channel, row.get(spec.key), row.get("start_time"), row.get("part"),
+                 row.get("job"), row.get("production_day_number"), row.get("run_time"),
+                 json.dumps(row, default=str), _now()))
+
+    # ---------------------------------------------------- part standards
+
+    def refresh_part_standard(self) -> int:
+        """Median and spread of ideal_time / run_cycles per part, over runs
+        with run_cycles > 200 - what schema.sql's refresh_part_standard()
+        does in Postgres. Never touches the hand-entered columns."""
+        import statistics
+
+        with self._lock:
+            per: dict[str, list[float]] = {}
+            for part, ict in self.db.execute(
+                    "SELECT part, ideal_time / run_cycles FROM part_run "
+                    "WHERE deleted_at IS NULL AND part IS NOT NULL AND run_cycles > 200"):
+                per.setdefault(part, []).append(ict)
+            now = _now()
+            for part, xs in per.items():
+                self.db.execute(
+                    """INSERT INTO part_standard (part, ideal_cycle_time, ict_stddev, sample_runs,
+                                                ict_updated_at, updated_at)
+                       VALUES (?, ?, ?, ?, ?, ?)
+                       ON CONFLICT (part) DO UPDATE SET
+                           ideal_cycle_time = excluded.ideal_cycle_time, ict_stddev = excluded.ict_stddev,
+                           sample_runs = excluded.sample_runs, ict_updated_at = excluded.ict_updated_at,
+                           updated_at = excluded.updated_at""",
+                    (part, statistics.median(xs), statistics.stdev(xs) if len(xs) > 1 else None,
+                     len(xs), now, now))
+            return len(per)
 
     # ------------------------------------------------------------ epochs
 

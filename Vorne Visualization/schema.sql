@@ -51,8 +51,10 @@
 --
 -- * All timestamps are timestamptz (stored UTC). Reporting timezone is
 --   America/Toronto. The reporting day key is production_day_number - label
---   it "production day" in any UI, never "date": it starts at 07:00, not
---   midnight.
+--   it "production day" in any UI, never "date". Measured on all four
+--   devices: a production day starts with its first shift - 23:00 the
+--   evening before when a third shift runs, otherwise 07:00 - and an
+--   unscheduled 23:00-07:00 block stays with the day before.
 
 BEGIN;
 
@@ -228,6 +230,24 @@ CREATE TABLE IF NOT EXISTS current_state (
     shift_target_count        double precision,
     categories             jsonb,              -- raw, for debugging
     category_display_names jsonb
+);
+
+-- Each channel's currently open event, replaced by the sync on every run.
+-- Open events are never loaded as facts; this is what lets the app mark them
+-- and warn when one has been open far too long - AreaD's job 3043984 sat open
+-- from 25 August 2026 for six weeks with nothing watching.
+CREATE TABLE IF NOT EXISTS open_event (
+    device_id             text        NOT NULL REFERENCES device (device_id),
+    channel               text        NOT NULL,
+    event_key             bigint,
+    start_time            timestamptz,
+    part                  text,
+    job                   text,
+    production_day_number int,
+    run_time              double precision,
+    fields                jsonb       NOT NULL,   -- every field, converted as for a closed row
+    captured_at           timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (device_id, channel)
 );
 
 -- Ideal cycle time per part. The derived columns are refreshed by
@@ -774,10 +794,18 @@ FROM runs r
 LEFT JOIN part_standard ps USING (part)
 GROUP BY r.part, ps.part;
 
--- Everything suspicious, one row per record per issue. Shown in the app,
--- reported by verify.py, never fatal to a load.
+-- Everything suspicious, one row per record per issue, across every fact
+-- table. Shown in the app, reported by verify.py, never fatal to a load.
 CREATE OR REPLACE VIEW data_quality AS
-WITH facts AS (
+WITH state_median AS (
+    -- Each state's usual length on each line, for the implausible-duration
+    -- check. Durations are the device's own and already exclude interruptions.
+    SELECT device_id, process_state, percentile_cont(0.5) WITHIN GROUP (ORDER BY duration_s) AS median_s
+      FROM state_event
+     WHERE deleted_at IS NULL AND duration_s > 0
+       AND performance_impact IN ('planned_stop', 'unplanned_stop')
+     GROUP BY device_id, process_state
+), facts AS (
     SELECT 'hour_record' AS source, device_id, shift_hour_event_id AS event_id,
            start_time, end_time, production_day_number, config_epoch,
            in_count, good_count, reject_count, run_time, ideal_time,
@@ -825,10 +853,51 @@ CROSS JOIN LATERAL (VALUES
          format('reject %s = -good, run_time 0', f.reject_count)),
     ('acct_gap',         f.is_full_hour AND abs(f.acct_gap_s) > 180,
          format('%s s unaccounted in a full hour', round(f.acct_gap_s::numeric, 1))),
+    ('negative_duration_suspected_clock_correction', f.end_time < f.start_time,
+         format('ends %s s before it starts', round(EXTRACT(EPOCH FROM f.start_time - f.end_time)::numeric, 1))),
     ('missing_times',    f.start_time IS NULL OR f.end_time IS NULL,
          'start_time or end_time missing')
 ) AS i (issue, hit, detail)
-WHERE i.hit;
+WHERE i.hit
+UNION ALL
+-- State events: the Pareto source. Five FR8 not_monitored events end before
+-- they start (worst -34 s) - most likely the device clock being corrected
+-- mid-event. Kept as reported; the app shows such durations as 0.
+SELECT 'state_event', s.device_id, s.process_state_event_id, s.start_time, s.production_day_number,
+       s.config_epoch, i.issue, i.detail
+FROM state_event s
+LEFT JOIN state_median m USING (device_id, process_state)
+CROSS JOIN LATERAL (VALUES
+    -- A single stop far too long for what it says it is: a parked line left
+    -- in "maintenance" (AreaB, July 2026: one 260 h event), a two-day
+    -- "changeover", a "down" left open over a weekend. Inflates planned or
+    -- unplanned stop; with availability = run / (run + unplanned + planned)
+    -- it lowers availability and inflates calendar use. Thresholds mirror
+    -- config.yaml charts: implausible_* (24 h; or 12 h and 10x the median).
+    ('implausible_duration',
+         s.performance_impact IN ('planned_stop', 'unplanned_stop')
+         AND (s.duration_s > 24 * 3600 OR (s.duration_s > 12 * 3600 AND s.duration_s > 10 * m.median_s)),
+         format('%s for %s h, %s times its usual %s min on this line', s.process_state,
+                round((s.duration_s / 3600)::numeric, 1), round((s.duration_s / NULLIF(m.median_s, 0))::numeric),
+                round((m.median_s / 60)::numeric))),
+    ('negative_duration_suspected_clock_correction', s.duration_s < 0 OR s.end_time < s.start_time,
+         format('%s: duration %s s', s.process_state, round(s.duration_s::numeric, 1))),
+    ('missing_times', s.start_time IS NULL OR s.end_time IS NULL,
+         'start_time or end_time missing'),
+    ('missing_reason_key', s.performance_impact = 'unplanned_stop' AND s.process_state_reason IS NULL,
+         'unplanned stop with no reason key at all')
+) AS i (issue, hit, detail)
+WHERE s.deleted_at IS NULL AND i.hit
+UNION ALL
+-- Quality events: empty today; checked so problems show the day they start.
+SELECT 'quality_event', q.device_id, q.record_id, NULL::timestamptz, q.production_day_number,
+       q.config_epoch, i.issue, i.detail
+FROM quality_event q
+CROSS JOIN LATERAL (VALUES
+    ('missing_production_day', q.production_day_number IS NULL, 'production_day_number missing'),
+    ('negative_reject_count', q.count < 0, format('count %s', q.count))
+) AS i (issue, hit, detail)
+WHERE q.deleted_at IS NULL AND i.hit;
 
 -- Per device per channel: is the sync keeping up?
 CREATE OR REPLACE VIEW sync_status AS
@@ -920,8 +989,9 @@ GRANT USAGE ON SCHEMA public TO xl_sync, xl_reader;
 -- Sync service.
 GRANT SELECT, INSERT, UPDATE ON
     device, sync_state, sync_heartbeat, sync_quarantine, dimension_value, current_state,
-    hour_record, shift_record, state_event, part_run, job_run, quality_event
+    hour_record, shift_record, state_event, part_run, job_run, quality_event, open_event
     TO xl_sync;
+GRANT DELETE ON open_event TO xl_sync;                     -- a channel with no open event
 GRANT SELECT ON device_config_epoch TO xl_sync;            -- epochs are set by a human
 GRANT SELECT ON part_standard TO xl_sync;
 GRANT INSERT (part, ideal_cycle_time, ict_stddev, sample_runs, ict_updated_at, updated_at)
