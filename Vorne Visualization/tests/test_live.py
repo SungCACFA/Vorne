@@ -208,7 +208,9 @@ def test_panels_read_the_table_only(live_app):
     assert h.count('<section class="lpanel') == 4 and h.count("lpanel stale") == 0
     for text in ("No Production", "Maintenance", "Down", "Changeover", "Waiting - Bulk", "Preventative Maintenance"):
         assert text in h
-    assert 'class="lstate imp-unp"' in h and 'class="lstate imp-nsc"' in h and h.count('class="lstate imp-pln"') == 2
+    # AreaD's recorded down has 9,450 s counted (157 min): past 60 min, so extended
+    assert 'class="lstate imp-unp tier-extended"' in h and 'class="lstate imp-nsc"' in h
+    assert h.count('class="lstate imp-pln"') == 2                      # planned stops: no tier, never pulse
     # AreaE's shift: availability 814 / (814 + 1541 + 4866) = 11.3%; performance 114.6 / 814 = 14.1%
     assert "11.3%" in h and "14.1%" in h
     assert "All" in h and "data-oldest" in h and ">Refresh</button>" in h
@@ -295,7 +297,7 @@ def test_the_browser_marks_a_reading_stale_as_it_ages(live_app, tmp_path):
     assert "stale" in c2 and a2 >= 17 and v2 == "4 of 4 lines stale"
     # opened from a file, every poll fails: the values stay, the ages climb, and the marker says so
     assert re.search(r'class="lpoll[^"]*down[^"]*"[^>]*>no update for \d+ s<', dom)
-    assert ">No Production</p>" in dom                              # last values kept, not blanked
+    assert ">No Production</span>" in dom                              # last values kept, not blanked
 
 
 # ------------------------------------------------------------ auto-refresh
@@ -409,7 +411,7 @@ def test_the_page_updates_in_place_without_reloading(live_app, tmp_path):
         server.shutdown()
     panel = dom[dom.index('data-device="AreaD"') - 40:]
     panel = panel[:panel.index("</section>")]
-    assert ">Running</p>" in panel and ">Down</p>" not in panel and "imp-run" in panel
+    assert ">Running</span>" in panel and ">Down</span>" not in panel and "imp-run" in panel
     assert 'class="lpanel"' in panel                                 # current, not stale
     assert int(re.search(r'<body[^>]*data-polls="(\d+)"', dom).group(1)) >= 1
     assert re.search(r'class="lpoll[^"]*"[^>]*>updating<', dom)
@@ -472,3 +474,155 @@ def test_days_ago_rounds_to_the_nearest_day(live_app):
                    (start.isoformat(), 47 * 3600))
     h = re.sub(r"\s+", " ", client.get("/live").get_data(as_text=True))
     assert f"counted · since {weekday_clock(start)} (5 days ago)" in h
+
+
+# ------------------------------------------------------------ warning tiers
+
+@pytest.mark.parametrize("impact,minutes,expected", [
+    ("unplanned_stop", 0, "new"), ("unplanned_stop", 14.99, "new"), ("unplanned_stop", 15, "down"),
+    ("unplanned_stop", 60, "down"), ("unplanned_stop", 60.01, "extended"), ("unplanned_stop", 3000, "extended"),
+    ("unplanned_stop", None, "unknown"),
+    ("planned_stop", 1, None), ("not_scheduled", 1, None), ("run", 1, None),
+])
+def test_tiers(impact, minutes, expected):
+    assert V.tier(impact, minutes, 15, 60) == expected
+
+
+def set_state(db_path, dev, *, impact="unplanned_stop", minutes=5.0, age_s=1):
+    put(db_path, dev, age_s=age_s)
+    with sqlite3.connect(db_path) as db:
+        db.execute("UPDATE current_state SET performance_impact=?, process_state='down', process_state_label='Down', "
+                   "state_elapsed_s=? WHERE device_id=?", (impact, minutes * 60, dev))
+
+
+def band(h, dev):
+    panel = h[h.index(f"<h2>{dev}</h2>"):]
+    panel = panel[panel.index('<p class="lstate'):]               # the state band, not the (hidden) stale banner
+    return panel[:panel.index("</p>")]
+
+
+def test_each_tier_on_the_page(live_app):
+    client, db_path = live_app
+    set_state(db_path, "FR8", minutes=4)
+    set_state(db_path, "AreaB", minutes=30)
+    set_state(db_path, "AreaD", minutes=90)
+    set_state(db_path, "AreaE", impact="planned_stop", minutes=4)
+    h = client.get("/live").get_data(as_text=True)
+    assert 'class="lstate imp-unp tier-new"' in band(h, "FR8") and "\u26a0 New" in band(h, "FR8")
+    assert 'class="lstate imp-unp tier-down"' in band(h, "AreaB") and "\u26a0</span>" in band(h, "AreaB")
+    assert 'class="lstate imp-unp tier-extended"' in band(h, "AreaD") and "\u26a0 Extended" in band(h, "AreaD")
+    assert 'class="lstate imp-pln"' in band(h, "AreaE") and "lmark" not in band(h, "AreaE")   # amber, never pulses
+
+
+def test_status_bar_counts_lines_down_and_new_stops(live_app):
+    client, db_path = live_app
+    set_state(db_path, "FR8", minutes=4)
+    set_state(db_path, "AreaB", minutes=200)
+    set_state(db_path, "AreaD", impact="planned_stop")
+    set_state(db_path, "AreaE", impact="run")
+    h = re.sub(r"\s+", " ", client.get("/live").get_data(as_text=True))
+    assert "<strong>2 lines down</strong>, 1 in the last 15 min" in h
+
+
+def test_status_bar_with_none_down_and_one_down(live_app):
+    client, db_path = live_app
+    for d in DEVICES:
+        set_state(db_path, d, impact="run")
+    assert "No line down" in client.get("/live").get_data(as_text=True)
+    set_state(db_path, "AreaD", minutes=40)
+    h = re.sub(r"\s+", " ", client.get("/live").get_data(as_text=True))
+    assert "<strong>1 line down</strong></span>" in h                    # no new stop, so no "in the last" part
+
+
+def test_a_stale_reading_is_not_counted_as_down_now(live_app):
+    client, db_path = live_app
+    set_state(db_path, "FR8", minutes=4, age_s=90)                       # the writer stopped 90 s ago
+    h = re.sub(r"\s+", " ", client.get("/live").get_data(as_text=True))
+    assert "No line down" in h and '<section class="lpanel stale"' in h
+
+
+def test_tier_thresholds_come_from_config(tmp_path):
+    from webapp import create_app
+    from xlpipe.cache import SQLiteCache
+
+    db_path = tmp_path / "c.db"
+    SQLiteCache(db_path).close()
+    cfg = tmp_path / "c.yaml"
+    cfg.write_text(f"cache_path: {db_path.as_posix()}\nlive:\n  new_stop_minutes: 5\n  extended_stop_minutes: 20\n"
+                   "devices:\n  - {id: AreaD, host: x}\n", encoding="utf-8")
+    set_state(db_path, "AreaD", minutes=10)
+    assert "tier-down" in create_app(cfg).test_client().get("/live").get_data(as_text=True)
+    set_state(db_path, "AreaD", minutes=30)
+    assert "tier-extended" in create_app(cfg).test_client().get("/live").get_data(as_text=True)
+
+
+def test_panels_never_move(live_app):
+    """Fixed positions, whatever is down: FR8, AreaB, AreaD, AreaE."""
+    client, db_path = live_app
+    set_state(db_path, "AreaE", minutes=2)
+    set_state(db_path, "AreaD", minutes=500)
+    for d in ("FR8", "AreaB"):
+        set_state(db_path, d, impact="run")
+    h = client.get("/live").get_data(as_text=True)
+    assert re.findall(r'data-device="(\w+)"', h) == ["FR8", "AreaB", "AreaD", "AreaE"]
+
+
+def test_the_pulse_rules():
+    css = (Path(__file__).parent.parent / "webapp" / "static" / "style.css").read_text(encoding="utf-8")
+    assert ('.lstate.tier-new::before{content:"";position:absolute;inset:0;z-index:-1;background:var(--unp);\n'
+            "animation:lpulse 1.5s ease-in-out infinite}") in css         # the band's background, not the word
+    assert "@keyframes lpulse{0%,100%{opacity:1}50%{opacity:.65}}" in css
+    rm = css[css.index("@media(prefers-reduced-motion:reduce){\n  .lstate"):]
+    assert rm.startswith("@media(prefers-reduced-motion:reduce){\n  .lstate.tier-new::before{animation:none}")
+    assert ".lpanel.stale .lstate.tier-new::before{animation:none}" in css
+
+
+PULSE_PROBE = r"""<script>
+addEventListener('load', () => setTimeout(() => {
+  const b = document.querySelector('.lstate.tier-new'), cs = getComputedStyle(b, '::before');
+  document.body.dataset.probe = JSON.stringify({
+    anim: cs.animationName, dur: cs.animationDuration,
+    wordStill: getComputedStyle(b.querySelector('.lword')).opacity === '1' && getComputedStyle(b).animationName === 'none',
+    marker: getComputedStyle(b.querySelector('.lmark.rm')).display,
+    border: getComputedStyle(b).outlineStyle + ' ' + getComputedStyle(b).outlineWidth});
+}, 200));
+</script>"""
+
+
+@pytest.mark.parametrize("reduced", [False, True])
+def test_the_pulse_in_a_browser(live_app, tmp_path, reduced):
+    import shutil
+    import subprocess
+    from html import unescape
+
+    edge = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
+    if not edge.exists() and not shutil.which("msedge"):
+        pytest.skip("no Edge on this machine to run the page")
+    client, db_path = live_app
+    set_state(db_path, "FR8", minutes=3)
+    css = (Path(__file__).parent.parent / "webapp" / "static" / "style.css").read_text(encoding="utf-8")
+    html = client.get("/live").get_data(as_text=True).replace('<link rel=stylesheet href="/static/style.css">',
+                                                               f"<style>{css}</style>")
+    f = tmp_path / "pulse.html"
+    f.write_text(re.sub(r'<link href="https://fonts[^>]+>', "", html) + PULSE_PROBE, encoding="utf-8")
+    args = [str(edge), "--headless=new", "--disable-gpu", f"--user-data-dir={tmp_path / 'edge'}",
+            "--virtual-time-budget=3000", "--dump-dom", f.as_uri()]
+    if reduced:
+        args.insert(2, "--force-prefers-reduced-motion")
+    dom = subprocess.run(args, capture_output=True, text=True, encoding="utf-8", timeout=120).stdout
+    o = json.loads(unescape(re.search(r'data-probe="([^"]+)"', dom).group(1)))
+    assert o["wordStill"] is True                                         # the word never animates
+    if reduced:
+        assert o["anim"] == "none" and o["marker"] != "none" and o["border"] == "solid 6px"   # flex items compute as block
+    else:
+        assert o["anim"] == "lpulse" and o["dur"] == "1.5s" and o["marker"] == "none" and o["border"].startswith("none")
+
+
+def test_the_tier_counts_the_readings_age(live_app):
+    """14 min counted at a reading taken 2 min ago is a 16-minute stop now: no longer new. (Read with a
+    stale threshold well above the age, so the panel is still current.)"""
+    client, db_path = live_app
+    client.application.config["LIVE"]["stale_after"] = 600
+    set_state(db_path, "AreaB", minutes=14, age_s=120)
+    h = client.get("/live").get_data(as_text=True)
+    assert 'tier-down' in band(h, "AreaB") and "in the last 15 min" not in h

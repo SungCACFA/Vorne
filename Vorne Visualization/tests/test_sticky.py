@@ -13,6 +13,7 @@ import json
 import re
 import shutil
 import subprocess
+import warnings
 from pathlib import Path
 
 import pytest
@@ -59,6 +60,8 @@ def measure(html: str, width: int, tmp_path: Path) -> dict:
                              capture_output=True, text=True, encoding="utf-8", timeout=180).stdout
         m = re.search(r'data-band="([^"]+)"', dom)
         if m:
+            if budget != 5000:      # say so: a recurrence must be visible, not absorbed by the retry
+                warnings.warn(f"Edge needed a retry to run the layout probe ({width}px): the flaky case recurred")
             return json.loads(m.group(1).replace("&quot;", '"'))
     pytest.fail("Edge returned the page without running the layout probe, twice")
 

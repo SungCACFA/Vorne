@@ -54,6 +54,15 @@ live:
   timeout_seconds: 3
   poll_seconds: 5
   stale_after_seconds: 20
+  # Warning tiers for a line in an unplanned stop (Down), by minutes in that state. The signal that
+  # matters is a NEW stop, not being stopped: a line down for days is red but still, so a pulse means
+  # something. Tune these after watching the screen for a week.
+  #   under new_stop_minutes                   red band, slow pulse
+  #   new_stop_minutes to extended_stop_minutes solid red, warning marker
+  #   over extended_stop_minutes               solid red, marked "extended"
+  # Planned stops (changeover, maintenance, setup) stay amber and never pulse; not scheduled stays grey.
+  new_stop_minutes: 15
+  extended_stop_minutes: 60
 
 devices:
   - {id: FR8,   host: 10.15.22.19}

@@ -252,3 +252,26 @@ svg rect.hl{stroke:var(--ink);stroke-width:2.5}
 .strip.hl .spark{outline:2px solid var(--ink);outline-offset:1px}
 .strip.hl h3{text-decoration:underline;text-underline-offset:3px}
 @media print{tr.hl > th,tr.hl > td{background:none}}
+/* ---- live warning tiers: weight and motion, never a new colour. Only a NEW unplanned stop pulses. */
+.lstate{position:relative;isolation:isolate;display:flex;flex-wrap:wrap;align-items:center;gap:6px 18px}
+.lstate .lmark{margin-left:auto;font-size:20px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+padding:3px 12px;border:2px solid currentColor;line-height:1.3}
+.lstate .lmark.rm{display:none}                               /* the new-stop marker: reduced motion only */
+/* The pulse is a layer behind the word, so the band breathes and the word stays still: slow (1.5 s) and
+   gentle. Its low point is 65%, not 55%: white text on 55% red is 2.7:1, under the 3:1 large-text floor;
+   at 65% it is 3.4:1. */
+.lstate.tier-new{background:transparent}
+.lstate.tier-new::before{content:"";position:absolute;inset:0;z-index:-1;background:var(--unp);
+animation:lpulse 1.5s ease-in-out infinite}
+@keyframes lpulse{0%,100%{opacity:1}50%{opacity:.65}}
+.lpanel.stale .lstate.tier-new::before{animation:none}         /* an old reading cannot announce a new stop */
+@media(prefers-reduced-motion:reduce){
+  .lstate.tier-new::before{animation:none}
+  .lstate.tier-new{outline:6px solid var(--ink);outline-offset:-6px}   /* an outline: drawn over the red layer */
+  .lstate.tier-new .lmark.rm{display:inline-block}
+}
+.ldown strong{color:var(--unp)}
+@media print{.lstate.tier-new::before{animation:none}}
+/* a reason row whose total includes implausible stops the charts leave out */
+tr.flagrow > td{text-align:left;font-size:13px;color:var(--mute);padding:0 10px 10px 28px;border-bottom:1px solid var(--rule)}
+tr.flagrow > td::before{content:"↳ ";color:var(--unp)}

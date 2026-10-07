@@ -114,6 +114,8 @@ def create_app(config_path: str | Path = ROOT / "config.yaml") -> Flask:
                           # 20 s by default: four writer cycles, so 5 s writer / 5 s poll jitter never trips it
                           "stale_after": float(live_cfg.get("stale_after_seconds", 4 * interval)),
                           "poll": float(live_cfg.get("poll_seconds", interval)),
+                          "new_stop": float(live_cfg.get("new_stop_minutes", 15)),
+                          "extended_stop": float(live_cfg.get("extended_stop_minutes", 60)),
                           "devices": [d["id"] for d in cfg.get("devices") or []]}
     app.config["ICT_TOLERANCE"] = float(charts_cfg.get("ict_change_tolerance", D.ICT_TOLERANCE))
     default_rule = D.ImplausibleRule()
@@ -309,6 +311,13 @@ def create_app(config_path: str | Path = ROOT / "config.yaml") -> Flask:
             # 55-stop, 8-minute nuisance into an apparent 68-minute breakdown. The tables keep everything.
             unp_flags = [r for r in flagged if r["impact"] == "unplanned_stop"]
             ctx["chart_excluded"] = (len(unp_flags), sum(r["seconds"] for r in unp_flags))
+            # ...and per reason, so the table can say at the row why it and the charts rank it differently
+            by_reason: dict[str, list] = {}
+            for r in unp_flags:
+                n_s = by_reason.setdefault(r["reason"] or "Unassigned", [0, 0.0])
+                n_s[0] += 1
+                n_s[1] += r["seconds"]
+            ctx["flag_by_reason"] = by_reason
             clean = D.reasons(path, dev, lo, hi, "unplanned_stop", flag_ids, part)
             ctx["quadrant"] = C.quadrant([dict(r) for r in clean], len(days), **app.config["CHARTS"])
             ctx["pareto"] = C.pareto([dict(r) for r in clean])
@@ -529,7 +538,10 @@ def create_app(config_path: str | Path = ROOT / "config.yaml") -> Flask:
 
         cfg = app.config["LIVE"]
         now = datetime.now(timezone.utc)
-        rows = L.readings(app.config["CACHE_PATH"], cfg["devices"] or devices, now, cfg["stale_after"])
+        rows = L.readings(app.config["CACHE_PATH"], cfg["devices"] or devices, now, cfg["stale_after"],
+                          cfg["new_stop"], cfg["extended_stop"])
+        # lines down now, and how many of those stops are new; a stale reading is not "now"
+        down = [r for r in rows or [] if r["tier"] and not r["stale"]]
         read = [r for r in rows or [] if r["age_s"] is not None]
         # link a part only where it has a product page (one closed run at least)
         known = {r["part"] for r in rows or [] if r.get("part") and D.part_days(app.config["CACHE_PATH"], r["part"])}
@@ -537,6 +549,8 @@ def create_app(config_path: str | Path = ROOT / "config.yaml") -> Flask:
                 "oldest": max(read, key=lambda r: r["age_s"], default=None),
                 "never": [r["device_id"] for r in rows or [] if r["age_s"] is None],
                 "stale_after": cfg["stale_after"], "interval": cfg["interval"], "poll": cfg["poll"],
+                "down_count": len(down), "new_count": sum(r["tier"] == "new" for r in down),
+                "new_stop": cfg["new_stop"], "extended_stop": cfg["extended_stop"],
                 "impact_name": C.LABEL, "tz": D.TZ}
 
     @app.route("/live")

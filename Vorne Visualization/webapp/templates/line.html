@@ -2,7 +2,9 @@
 {% from "_macros.html" import stack, rate_heads, perf, key, spark, counts_flag, methodology %}
 
 {#- hl: highlight each row with its chart elements (the unplanned reasons, which the quadrant and Pareto show) -#}
-{% macro reason_table(rows, colour, title, lead, hl=false) -%}
+{#- flags: reason -> [implausible stops, their seconds]; each such row gets a note beneath it saying what
+    the charts leave out and what they show instead. The table itself keeps every stop. -#}
+{% macro reason_table(rows, colour, title, lead, hl=false, flags={}) -%}
 {% if rows %}
 {%- set mx = rows[0].seconds or 1 -%}
 <h2>{{ title }}</h2><p class=note>{{ lead }}</p>
@@ -12,6 +14,12 @@
 <tr{% if hl %} data-hl="{{ r.reason|reasonkey }}"{% endif %}><th>{{ r.reason }}</th><td class=bar><i style="width:{{ '%.2f'|format(r.seconds / mx * 100) }}%;background:var(--{{ colour }})"></i></td>
 <td>{{ r.seconds|hrs }}</td><td>{{ '{:,}'.format(r.events) }}</td><td>{{ (r.seconds / r.events)|mins }}</td>
 <td>{{ '%.0f'|format(r.cumulative * 100) }}%</td></tr>
+{%- set f = flags.get(r.reason) %}
+{%- if f %}
+<tr class=flagrow{% if hl %} data-hl="{{ r.reason|reasonkey }}"{% endif %}><td colspan=6>Includes {{ f[0] }} implausible
+stop{{ 's' if f[0] != 1 }} ({{ f[1]|hrs }} h), left out of the charts above: there, {{ r.reason }} is
+{{ (r.seconds - f[1])|hrs }} h over {{ '{:,}'.format(r.events - f[0]) }} stop{{ 's' if r.events - f[0] != 1 }}.</td></tr>
+{%- endif %}
 {% endfor %}
 {% if rows|length > 20 %}{% set rest = rows[20:] %}
 <tr><th class=muted>{{ rest|length }} more reason{{ 's' if rest|length > 1 }}</th><td class=bar></td>
@@ -147,7 +155,7 @@ from a fix list.</strong>{% endif %}{% endif %}</p>
 {{ left_out(chart_excluded) }}
 
 {{ reason_table(unplanned, 'unp', 'Why it stopped',
-   'Unplanned stops ranked by hours lost. Many short events point to a nuisance problem; few long ones point to a process or parts problem.', hl=true) }}
+   'Unplanned stops ranked by hours lost. Many short events point to a nuisance problem; few long ones point to a process or parts problem.', hl=true, flags=flag_by_reason or {}) }}
 {{ reason_table(planned, 'pln', 'Planned stops',
    'Changeover, maintenance and setup: planned, but still time the line was not producing.') }}
 

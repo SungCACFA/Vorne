@@ -202,3 +202,42 @@ def test_july_panel_adjusts_availability_too(app_client):
     html = app_client.get("/line/AreaB?g=month&p=2026-07").get_data(as_text=True)
     panel = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", html[html.index("far too long"):html.index("<h2>Hour by hour")]))
     assert "availability over all records 10.1% rather than 1.3%" in panel
+
+
+# ------------------------------------- the table marks what the charts leave out
+
+def flag_notes(html):
+    why = html[html.index("<h2>Why it stopped"):html.index("<h2>Planned stops")]
+    notes = re.findall(r"<tr class=flagrow[^>]*><td colspan=6>(.*?)</td></tr>", why, re.S)
+    return why, [re.sub(r"\s+", " ", n).replace("&amp;", "&") for n in notes]
+
+
+def test_a_flagged_row_says_why_it_ranks_differently(app_client):
+    """Pick & Place 2: the table's 63.5 h over 56 stops includes one 56.3 h "down"; the charts show
+    7.3 h over 55 (test_charts pins the quadrant's 7.3 h / 55 independently)."""
+    h = app_client.get("/line/AreaB?g=ytd&p=2026").get_data(as_text=True)
+    why, notes = flag_notes(h)
+    assert re.search(r"<th>Pick &amp; Place 2</th>.*?<td>63.5</td><td>56</td>", why, re.S)    # the complete record
+    assert ("Includes 1 implausible stop (56.3 h), left out of the charts above: there, Pick & Place 2 is "
+            "7.3 h over 55 stops.") in notes
+    row = why[why.index("<th>Pick &amp; Place 2</th>"):]
+    assert row.index("<tr class=flagrow") == row.index("<tr")            # the note sits directly beneath its row
+
+
+def test_every_flagged_stop_is_noted_once(app_client):
+    """Six implausible unplanned stops, 173 h - the same the charts' left-out note counts."""
+    h = app_client.get("/line/AreaB?g=ytd&p=2026").get_data(as_text=True)
+    _, notes = flag_notes(h)
+    hours = [float(re.search(r"\(([\d.]+) h\)", n).group(1)) for n in notes]
+    assert len(notes) == 6 and abs(sum(hours) - 173.6) < 0.05           # 56.3 + 28.8 + 21.2 + 30.2 + 12.9 + 24.2
+    assert "6 implausible unplanned stops (173 h)" in re.sub(r"\s+", " ", h)
+
+
+def test_the_note_lights_up_with_its_reason(app_client):
+    h = app_client.get("/line/AreaB?g=ytd&p=2026").get_data(as_text=True)
+    assert '<tr class=flagrow data-hl="unp:Pick &amp; Place 2"><td colspan=6>' in h
+
+
+def test_no_note_without_a_flagged_stop(app_client):
+    h = app_client.get("/line/FR8?g=day&p=2026-07-03").get_data(as_text=True)
+    assert "<tr class=flagrow" not in h

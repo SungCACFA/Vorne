@@ -1,3 +1,5 @@
 {%- if oldest %}Oldest reading: <strong>{{ oldest.device_id }}</strong>, taken
 <strong data-age data-age0="{{ '%.1f'|format(oldest.age_s) }}">{{ oldest.age_s|int }} s</strong> ago{% endif %}
 {%- if never %}{{ ' · ' if oldest }}<strong>{{ never|join(', ') }}</strong> never read{% endif %}
+{%- if oldest %} · <span class=ldown data-down="{{ down_count }}">{% if down_count %}<strong>{{ down_count }} line{{ 's' if down_count != 1 }} down</strong>
+{%- if new_count %}, {{ new_count }} in the last {{ new_stop|int }} min{% endif %}{% else %}No line down{% endif %}</span>{% endif %}

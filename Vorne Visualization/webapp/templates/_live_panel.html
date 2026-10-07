@@ -13,7 +13,14 @@
   ({{ r.last_error }}). {% endif %}<strong>Stale:</strong> these are the last good values, read at
   {{ clock(r.observed) }}, <span data-age>{{ r.age_s|int }} s</span> ago.</p>
   <div class=lvals>
-    <p class="lstate imp-{{ imp }}" title="{{ impact_name.get(r.performance_impact, r.performance_impact or '') }}">{{ r.process_state_label or (r.process_state or '—')|replace('_', ' ') }}</p>
+    {#- The tier changes weight and motion, never the colour: a NEW unplanned stop pulses (the band's
+        background only - the word stays still); 15-60 min is solid with a warning marker; past that it is
+        marked extended. With reduced motion the new stop gets a heavier border and the marker instead. -#}
+    <p class="lstate imp-{{ imp }}{{ (' tier-' ~ r.tier) if r.tier }}" title="{{ impact_name.get(r.performance_impact, r.performance_impact or '') }}"><span class=lword>{{ r.process_state_label or (r.process_state or '—')|replace('_', ' ') }}</span>
+      {%- if r.tier == 'new' %}<span class="lmark rm" aria-hidden=true>⚠ New</span><span class=sr>: a new unplanned stop, under {{ new_stop|int }} minutes</span>
+      {%- elif r.tier == 'down' %}<span class=lmark aria-hidden=true>⚠</span><span class=sr>: stopped {{ new_stop|int }} to {{ extended_stop|int }} minutes</span>
+      {%- elif r.tier == 'extended' %}<span class="lmark ext">⚠ Extended</span><span class=sr>: stopped over {{ extended_stop|int }} minutes</span>
+      {%- elif r.tier == 'unknown' %}<span class=sr>: unplanned stop, duration unknown</span>{% endif %}</p>
     {% if r.process_state_reason_display_name and r.process_state_reason_display_name != r.process_state_label %}
     <p class=lreason>{{ r.process_state_reason_display_name }}</p>{% endif %}
     {#- The device counts time in a state without the breaks and unscheduled time inside it. When the

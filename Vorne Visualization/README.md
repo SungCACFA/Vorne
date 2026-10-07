@@ -49,7 +49,7 @@ when there are, they go in `.env`, which is git-ignored.
 | `python -m webapp [--port N]` | The app. Reads the cache on every request, so a refresh shows on the next page load. Also runs the live writer for `/live` (`--no-live-writer` to leave it to a separate process). |
 | `python -m xlpipe live [--interval S]` | The live writer on its own: every device's real-time data into `current_state`, every 5 s. One writer at a time. |
 | `python -m webapp export [--out FILE] [--keep]` | A self-contained, read-only HTML snapshot of every page, product page and period (≈3 min, ≈2.6 MB). Deletes earlier exports in the same folder unless `--keep`. See below. |
-| `python -m pytest` | 364 tests, no device needed (≈4–7 min, most of it the export tests). |
+| `python -m pytest` | 388 tests, no device needed (≈4–7 min, most of it the export tests). |
 | `python tests/mutation_check.py` | Would the tests notice if the code were wrong? See Tests. |
 | `python preflight.py` | When there is a database path: DNS, TCP 5432, TLS, auth, permissions, latency, as separate steps. |
 
@@ -205,7 +205,10 @@ activity, the stop-reason quadrant (fixed lines: 1 stop per production day, 30 m
 
 **Implausible stops.** A planned or unplanned stop over 24 h, or over 12 h and 10× that state's median on that line,
 is flagged in a panel (42 on the recording; AreaB's 260 h "maintenance" in July). The **charts leave them out and say
-how many**; the **tables keep everything**. Nothing is recomputed in the stored data.
+how many**; the **tables keep everything**. Nothing is recomputed in the stored data. Where a reason in "Why it
+stopped" includes one, a note directly beneath its row says what the charts leave out and what they show instead
+("Includes 1 implausible stop (56.3 h), left out of the charts above: there, Pick & Place 2 is 7.3 h over 55
+stops"), so the reader sees why a table and chart rank it differently at the row itself.
 
 **Product pages** (`/product/<part>`, linked wherever a part is named): which lines ran it and how (runs, run h,
 down h, down h per run h, availability within its runs, performance, current ICT); every run on a timeline; the
@@ -309,6 +312,18 @@ been in its present state. No piece counts. Live only: not in the static export.
   device's own shift times, not the device's own percentages. Time in the present state is the device's own, which
   leaves out breaks and unscheduled time inside it. Where the wall clock since the state began is more than ten
   minutes past that, both are shown: "3 h 06 min counted · since Mon 08:40 (2 days ago)".
+- **Warning tiers.** The signal is a *new* unplanned stop, not being stopped: on 7 Oct all four lines were stopped
+  at once (AreaB five days in maintenance), and four pulsing panels would teach people to ignore the pulse. By
+  minutes in the state (the device's count plus the reading's age), set in `config.yaml` `live:`:
+  under `new_stop_minutes` (15) the red band pulses slowly; to `extended_stop_minutes` (60) it is solid red with a
+  warning marker; past that, solid red marked "extended". Planned stops stay amber and not-scheduled grey; neither
+  ever pulses. The tiers change weight and motion, never the colours.
+- The pulse is the band's background only (the word stays still): 1.5 s, easing between full and 65% opacity. The
+  brief said about 55%; at 55% white text on the red is 2.7:1, under the 3:1 floor for large text, so 65% (3.4:1).
+  With reduced motion there is no animation: a heavier border and a "New" marker instead. A stale reading never
+  pulses, since it cannot vouch for a new stop.
+- Panels never move: FR8, AreaB, AreaD, AreaE, whatever is down. The status line counts lines down now, and how many
+  in the last 15 minutes ("2 lines down, 1 in the last 15 min"); a stale reading is not counted as down now.
 - Shift names are the devices' display names. The underlying codes disagree between lines (AreaB's 07:00 shift is
   `second_shift`, FR8's is `first_shift`), so never compare shifts across lines by code.
 
@@ -338,7 +353,7 @@ no server and fetches nothing: open it in Edge, Chrome or Firefox, or attach it 
 
 ## Tests
 
-`python -m pytest` — 364 tests, four to seven minutes (most of it the export tests), no device. Fixtures in `tests/fixtures/devices/` (16 MB) are a
+`python -m pytest` — 388 tests, four to seven minutes (most of it the export tests), no device. Fixtures in `tests/fixtures/devices/` (16 MB) are a
 recorded first-run backfill of all four devices; the end-to-end tests replay them through the real sync into a fresh
 cache.
 
@@ -371,7 +386,7 @@ in that code would be compared with itself and pass.
 
 ### Mutation check
 
-`python tests/mutation_check.py` applies, one at a time, 110 deliberate bugs of the kind a refactor or a "helpful" fix
+`python tests/mutation_check.py` applies, one at a time, 121 deliberate bugs of the kind a refactor or a "helpful" fix
 could introduce — clamping a count, inverting a ratio, taking a mean for a median, starting weeks on Sunday — runs
 the suite against each, and restores the original. A bug the suite does not notice is a gap. It takes several minutes;
 `--list` shows the bugs, and numbers run a subset.
