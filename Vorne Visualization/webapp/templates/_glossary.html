@@ -1,8 +1,14 @@
 {#- The definitions of every measure this page named, from webapp/glossary.py (the wording of GLOSSARY.md),
     plus every entry they refer to. The term links point here, so without scripts a definition is one jump
-    away; with scripts this is where the panel takes its text from. The measures deliberately absent
-    (Quality, OEE, Labour) are on every page, so anyone looking for OEE finds out why it is not there. -#}
-{%- set absent = [term('quality'), term('oee'), term('labour')] %}
+    away; with scripts this is where the panel takes its text from. The measures withheld or unavailable
+    (Quality, OEE, TEEP, Labour) are on every page, OEE linking to its full entry, so anyone looking for it
+    finds it explained rather than only explained away. -#}
+{%- macro part(name, text) -%}
+{%- for para in text.split('\n\n') %}
+<p>{% if loop.first %}<span class=k>{{ name }}</span> {% endif %}{{ para|md }}</p>
+{%- endfor -%}
+{%- endmacro -%}
+{%- set absent = [term('quality'), term('oee'), term('teep'), term('labour')] %}
 {%- set used = terms_used() -%}
 <section class=glossary aria-labelledby=defs-h>
 <h3 id=defs-h>Definitions</h3>
@@ -11,18 +17,15 @@
 {%- for k, t in used %}
 <div class=def id="def-{{ k }}" data-def-body="{{ k }}">
 <dt>{{ t.label }}</dt>
-<dd>{% if t.status %}<p class=means>{{ t.status }}</p>
-<p><span class=k>Why</span> {{ t.why|md }}</p>
+<dd>{% if t.status %}<p class=means>{{ t.status|md }}</p>
+{%- if t.source %}{{ part('Source of the definition', t.source) }}{% endif %}
+{%- if t.why %}{{ part('Why', t.why) }}{% endif %}
 {%- else %}<p class=means>{{ t.means|md }}</p>
-{%- if t.formula %}
-<p><span class=k>Formula</span> {{ t.formula|md }}</p>{% endif %}
-{%- if t.answers %}
-<p><span class=k>What it answers</span> {{ t.answers|md }}</p>{% endif %}
-{%- if t.caution %}
-<p><span class=k>Caution</span> {{ t.caution|md }}</p>{% endif %}
+{%- if t.formula %}{{ part('Formula', t.formula) }}{% endif %}
+{%- if t.answers %}{{ part('What it answers', t.answers) }}{% endif %}
+{%- if t.source %}{{ part('Source', t.source) }}{% endif %}
+{%- if t.caution %}{{ part('Caution', t.caution) }}{% endif %}
 {%- endif %}
-{%- if t.source %}
-<p class=src><span class=k>Source</span> {{ t.source|md }}</p>{% endif %}
 {%- if t.see %}
 <p class=see><span class=k>See also</span> {% for s in t.see %}<a class=term href="#def-{{ s }}" data-def="{{ s }}">{{ glossary_label(s) }}</a>{{ ', ' if not loop.last }}{% endfor %}</p>{% endif %}</dd>
 </div>

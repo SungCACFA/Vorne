@@ -49,7 +49,7 @@ when there are, they go in `.env`, which is git-ignored.
 | `python -m webapp [--port N]` | The app. Reads the cache on every request, so a refresh shows on the next page load. Also runs the live writer for `/live` (`--no-live-writer` to leave it to a separate process). |
 | `python -m xlpipe live [--interval S]` | The live writer on its own: every device's real-time data into `current_state`, every 5 s. One writer at a time. |
 | `python -m webapp export [--out FILE] [--keep]` | A self-contained, read-only HTML snapshot of every page, product page and period (≈3 min, ≈2.6 MB). Deletes earlier exports in the same folder unless `--keep`. See below. |
-| `python -m pytest` | 405 tests, no device needed (≈4–7 min, most of it the export tests). |
+| `python -m pytest` | 407 tests, no device needed (≈4–7 min, most of it the export tests). |
 | `python tests/mutation_check.py` | Would the tests notice if the code were wrong? See Tests. |
 | `python preflight.py` | When there is a database path: DNS, TCP 5432, TLS, auth, permissions, latency, as separate steps. |
 
@@ -275,12 +275,16 @@ every view cost the export 0.24 MB. Planned-stop
 rows are not keyed, so a planned reason never lights the unplanned charts. Pointer only (hover, or a tap on touch);
 without scripts nothing changes.
 
-**The wording is GLOSSARY.md's**, word for word: definition, formula, what it answers, and the caution, which is
+**The wording is GLOSSARY.md's**, word for word, in 45 entries: definition, formula, what it answers, where the
+definition comes from (Vorne Vocab, TN000406, the API reference, or Danbro device data), and the caution, which is
 the point of each entry. `tests/test_explain.py` parses GLOSSARY.md and fails if `glossary.py` differs from it in any
-field, or drops or adds an entry; change GLOSSARY.md first. Entries that refer to each other carry "See also" links,
-and a page lists the entries its terms refer to as well, so every link has a target. **Measures deliberately
-absent** (Quality, OEE, Labour) are linked from the footer of every page, and wherever the words appear, with why
-each is missing.
+field, or drops or adds an entry; change GLOSSARY.md first (`glossary.py`'s entries were generated from it). The
+text keeps its markup - code, bold, paragraphs - and an italic mention of another entry (*Small stops*) is a link to
+it. Entries that refer to each other also carry "See also" links, and a page lists every entry its terms refer to, so
+every link has a target. **OEE has a full section** (OEE, its three losses, OEE loss, fully productive time, hidden
+factory time, the six big losses, Efficiency), defined even where withheld: anyone looking for OEE finds it
+explained, not only explained away. The footer of every page links what is not shown - Quality, OEE (its full
+entry), TEEP, Labour - each with why.
 
 ## The sticky band
 
@@ -372,7 +376,7 @@ no server and fetches nothing: open it in Edge, Chrome or Firefox, or attach it 
 
 ## Tests
 
-`python -m pytest` — 405 tests, four to seven minutes (most of it the export tests), no device. Fixtures in `tests/fixtures/devices/` (16 MB) are a
+`python -m pytest` — 407 tests, four to seven minutes (most of it the export tests), no device. Fixtures in `tests/fixtures/devices/` (16 MB) are a
 recorded first-run backfill of all four devices; the end-to-end tests replay them through the real sync into a fresh
 cache.
 
@@ -406,7 +410,7 @@ in that code would be compared with itself and pass.
 
 ### Mutation check
 
-`python tests/mutation_check.py` applies, one at a time, 136 deliberate bugs of the kind a refactor or a "helpful" fix
+`python tests/mutation_check.py` applies, one at a time, 141 deliberate bugs of the kind a refactor or a "helpful" fix
 could introduce — clamping a count, inverting a ratio, taking a mean for a median, starting weeks on Sunday — runs
 the suite against each, and restores the original. A bug the suite does not notice is a gap. It takes several minutes;
 `--list` shows the bugs, and numbers run a subset.

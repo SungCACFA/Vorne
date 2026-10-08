@@ -347,16 +347,16 @@ MUTATIONS: list[tuple[str, str, str, str]] = [
      "{{ (r.seconds - f[1])|hrs }} h over", "{{ r.seconds|hrs }} h over"),
     # --- the glossary wording
     ("glossary: a caution trimmed, losing a finding", "webapp/glossary.py",
-     "to capture. It was reporting schedule adherence, not asset use. Different measure, not a changed number.",
-     "to capture. Different measure, not a changed number."),
+     "'ESTRADIOL is exactly 0.375 s across all 88 runs — which confirms",
+     "'ESTRADIOL is close to 0.375 s on most runs — which confirms"),
     ("glossary: cross-referenced entries not on the page, so See also links go nowhere", "webapp/__init__.py",
      'for k in GL.with_references(g.get("terms_used", []))]', 'for k in g.get("terms_used", [])]'),
     ("glossary: Quality, OEE and Labour not reachable from every page", "webapp/templates/_glossary.html",
-     "{%- set absent = [term('quality'), term('oee'), term('labour')] %}", "{%- set absent = [] %}"),
+     "{%- set absent = [term('quality'), term('oee'), term('teep'), term('labour')] %}", "{%- set absent = [] %}"),
     ("glossary: formulas lose their code markup", "webapp/__init__.py",
      'r"<code>\\1</code>", out)', 'r"\\1", out)'),
     ("glossary: the cautions are not rendered", "webapp/templates/_glossary.html",
-     "{%- if t.caution %}", "{%- if false %}"),
+     "{%- if t.caution %}{{ part('Caution', t.caution) }}{% endif %}", "{%- if false %}{% endif %}"),
     ("glossary: a See also in the open panel jumps it elsewhere", "webapp/templates/_interact.html",
      "      if (pop.contains(a)) { if (fill(a.dataset.def)) pop.querySelector('.defclose').focus(); return; }", "      ;"),
     # --- total cycles: the denominator of every per-cycle figure
@@ -384,6 +384,19 @@ MUTATIONS: list[tuple[str, str, str, str]] = [
      "            if spec.table in added:", "            if False:"),
     ("cycles: replay pairs a clipped slice with the whole run's totals", "xlpipe/client.py",
      "                if k in have and extra.get(k) is not None and extra[k] != have[k]:", "                if False:"),
+    # --- the 45-entry glossary
+    ("glossary: an italic mention of another entry is no longer a link", "webapp/__init__.py",
+     """            return (f'<a class=term href="#def-{k}" data-def="{k}">{m.group(1)}</a>' if k""",
+     """            return (f'<a class=term href="#def-{k}" data-def="{k}">{m.group(1)}</a>' if False"""),
+    ("glossary: bold markup dropped", "webapp/__init__.py",
+     'out = _re.sub(r"\\*\\*([^*]+)\\*\\*", r"<strong>\\1</strong>", out)', "out = out"),
+    ("glossary: paragraphs run together", "webapp/templates/_glossary.html",
+     "{%- for para in text.split('\\n\\n') %}", "{%- for para in [text] %}"),
+    ("Unplanned h per run h: the column counts implausible stops again", "webapp/templates/product.html",
+     "format(l.down_s / l.run_s)", "format(l.unp_s / l.run_s)"),
+    ("glossary: the footer's OEE opens the pointer, not the full entry", "webapp/templates/_glossary.html",
+     "[term('quality'), term('oee'), term('teep'), term('labour')]",
+     "[term('quality'), term('oee_withheld'), term('teep'), term('labour')]"),
 ]
 
 
@@ -726,11 +739,11 @@ PINS: dict[str, str] = {
     'tiers: reduced motion still animates': 'c36f5343480c',
     'flag rows: the table no longer says what the charts leave out': 'e05e3786fa2a',
     "flag rows: the charts' figure stated without the excluded stop removed": '2f435a3f3bb2',
-    'glossary: a caution trimmed, losing a finding': '2d96355f0379',
+    'glossary: a caution trimmed, losing a finding': '1470eca69b54',
     'glossary: cross-referenced entries not on the page, so See also links go nowhere': '6021b54fe9b9',
-    'glossary: Quality, OEE and Labour not reachable from every page': 'bc0b9cd16342',
+    'glossary: Quality, OEE and Labour not reachable from every page': '1dbaea894ca1',
     'glossary: formulas lose their code markup': '52adc390ede0',
-    'glossary: the cautions are not rendered': '98bb706f2bb6',
+    'glossary: the cautions are not rendered': 'f8841aa09e1b',
     'glossary: a See also in the open panel jumps it elsewhere': 'e96bc359ae06',
     'cycles: derived ICT divided by run cycles again': 'bc70c19ea4fc',
     'cycles: the ICT history (reconfigurations) by run cycles': 'ffa69488aafb',
@@ -741,6 +754,11 @@ PINS: dict[str, str] = {
     'cycles: a clipped window slice fills a whole run': '193e1e7d3ce2',
     'cycles: a new column is added but its channel never re-pulled': '25ffdda460b1',
     "cycles: replay pairs a clipped slice with the whole run's totals": '418b6f418fb7',
+    'glossary: an italic mention of another entry is no longer a link': 'b0affad4dc24',
+    'glossary: bold markup dropped': 'eeda89176ef0',
+    'glossary: paragraphs run together': 'c39e3352ce09',
+    'Unplanned h per run h: the column counts implausible stops again': '28fa0b14600d',
+    "glossary: the footer's OEE opens the pointer, not the full entry": '1dbaea894ca1',
 }
 
 

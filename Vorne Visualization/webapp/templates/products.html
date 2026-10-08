@@ -42,7 +42,7 @@
 <h2>Standards and variance</h2>
 <p class=note>One row per part per line, for runs that started in this period. The derived ideal cycle time is the
 median of ideal time ÷ total cycles over that line's runs of more than 200 run cycles, all usable history; it is per
-machine <em>cycle</em>. Total cycles is the device's own: run cycles + small stops + partial cycles, the count its
+machine <em>cycle</em>. {{ term('total_cycles', 'Total cycles') }} is the device's own: run cycles + small stops + partial cycles, the count its
 ideal time is built from (Vorne: Ideal Time = Ideal Cycle Time × Total Cycles); actual s/cycle uses it too.
 {%- set nb = cycles_basis.values()|sum %}{% if nb %} <span data-cycles-basis>{% if cycles_basis.get('device', 0) == nb %}Total cycles
 here are the device's own, on all {{ '{:,}'.format(nb) }} runs.{% else %}Total cycles here: the device's own on

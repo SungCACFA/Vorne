@@ -106,8 +106,11 @@ def test_reconfigurations_on_the_recording(replayed_cache):
 def test_where_it_runs(app_client):
     h = app_client.get("/product/OTRIVIN?g=ytd&p=2026").get_data(as_text=True)
     t = text(h, "<h2>Where it runs", "<h2>Every run")
-    assert re.search(r"AreaB 8 52\.4 28\.0 0\.53 34\.5", t)
-    assert re.search(r"AreaD 11 132 88\.9 0\.67 93\.5", t)
+    # Down h is the device's own (implausible included); Unplanned h per run h leaves them out, like the
+    # charts: AreaB 15.1 / 52.4 = 0.29, AreaD 51.6 / 132.0 = 0.39 (clean hours, independent SQL)
+    assert re.search(r"AreaB 8 52\.4 28\.0 0\.29 34\.5", t)
+    assert re.search(r"AreaD 11 132 88\.9 0\.39 93\.5", t)
+    assert "Unplanned h per run h, and the charts below, leave them out" in t
     assert "0.857" in t and "2.143" in t                     # ICT now: AreaB 6/7 s, AreaD 15/7 s
     assert "reconfigured" not in t                           # the old "19 Jun" was an artefact of run cycles
 

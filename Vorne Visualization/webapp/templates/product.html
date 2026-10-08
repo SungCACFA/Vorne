@@ -20,8 +20,9 @@ on production day {{ last_ran[1]|pday }}.{% endif %}</p>
 <h2>Where it runs</h2>
 <p class=note>How {{ part }} does on each line. Unplanned h per run h is unplanned stop hours for every hour the line was
 cycling: the fair figure across products, since it does not depend on how long a run was. Available is run ÷ (run +
-down + planned) within its runs, the site's convention (planned stops count against it).{% if any_excluded %}
-Down hours here are the device's own, implausible stops included; the charts below leave them out.{% endif %}</p>
+down + planned) within its runs, the site's convention (planned stops count against it).{% if excluded[0] %}
+Down h here is the device's own, implausible stops included; Unplanned h per run h, and the charts below, leave
+them out.{% endif %}</p>
 <table><thead><tr><th>Line</th><td>Runs</td><td>{{ term('run_h') }}</td><td>{{ term('down', 'Down h') }}</td><td>{{ term('down_per_run', 'Unplanned h') }}<small class=f>per run h</small></td>
 <td>{{ term('planned', 'Planned h') }}</td><td>{{ term('available') }}<small class=f>within its runs</small></td><td>{{ term('performance') }}<small class=f>ideal ÷ run</small></td>
 <td title="median ideal time ÷ total cycles, runs over 200 run cycles, the current configuration level">ICT now<small class=f>s per cycle</small></td></tr></thead>
@@ -29,7 +30,7 @@ Down hours here are the device's own, implausible stops included; the charts bel
 {% for l in lines %}
 <tr><th><a class=lnk href="{{ url_for('line', dev=l.dev) }}{{ win.query(part=part) }}">{{ l.dev }}</a></th>
 <td>{{ l.runs|length }}</td><td>{{ l.run_s|hrs }}</td><td>{{ l.unp_s|hrs }}</td>
-<td>{{ '%.2f'|format(l.unp_s / l.run_s) if l.run_s else '—' }}</td><td>{{ l.pln_s|hrs }}</td>
+<td>{{ '%.2f'|format(l.down_s / l.run_s) if l.run_s else '—' }}</td><td>{{ l.pln_s|hrs }}</td>
 <td>{{ (l.run_s / (l.run_s + l.unp_s + l.pln_s))|pc if l.run_s + l.unp_s + l.pln_s else '—' }}</td>
 <td>{{ perf(l.ideal_s / l.run_s if l.run_s else none) }}</td>
 <td>{% if l.ict_levels.levels %}{{ '%.3f'|format(l.ict_levels.levels[-1].value) }}{% if l.ict_levels.changes %}

@@ -237,10 +237,17 @@ def create_app(config_path: str | Path = ROOT / "config.yaml") -> Flask:
 
     @app.template_filter("md")
     def md(text):
-        """GLOSSARY.md's two marks: `code` and *emphasis*. Everything else is escaped text."""
+        """GLOSSARY.md's marks: `code`, **bold** and *emphasis* - where the emphasised words name another
+        entry (*Small stops*), a link to it. Everything else is escaped text."""
         out = str(escape(text or ""))
         out = _re.sub(r"`([^`]+)`", r"<code>\1</code>", out)
-        return Markup(_re.sub(r"\*([^*]+)\*", r"<em>\1</em>", out))
+        out = _re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", out)
+
+        def italic(m):
+            k = GL.key_for(m.group(1))
+            return (f'<a class=term href="#def-{k}" data-def="{k}">{m.group(1)}</a>' if k
+                    else f"<em>{m.group(1)}</em>")
+        return Markup(_re.sub(r"\*([^*]+)\*", italic, out))
 
     app.jinja_env.globals.update(term=term, terms_used=terms_used, glossary_label=lambda k: GL.DEFS[k].label)
     # highlight keys: the same helpers the charts use, so a row and its chart element always match

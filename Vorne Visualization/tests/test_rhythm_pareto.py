@@ -99,8 +99,10 @@ def test_short_list_rule(need_of, short):
 
 def test_convention_is_named_on_the_panel_and_in_the_footer(app_client):
     h = app_client.get("/line/AreaB?g=month&p=2026-07").get_data(as_text=True)
-    panel = re.sub(r"\s+", " ", h[h.index("far too long"):h.index("<h2>Hour by hour")])
+    plain = lambda x: re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", x))    # noqa: E731  ("OEE" is a definition link)
+    panel = plain(h[h.index("far too long"):h.index("<h2>Hour by hour")])
     assert "Which availability convention." in panel
     assert "The common OEE convention leaves planned stops out" in panel
-    foot = h[h.index("<footer>"):]
-    assert "unlike the common\nOEE convention" in foot
+    foot = plain(h[h.index("<footer>"):])
+    assert "unlike the common OEE convention" in foot
+    assert '<a class=term href="#def-oee" data-def="oee">OEE</a> convention' in h

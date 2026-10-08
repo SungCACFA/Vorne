@@ -33,8 +33,8 @@ def test_the_page_shows_the_modules_wording_and_nothing_else(app_client):
     t = GL.DEFS["calendar_use"]
     block = h[h.index('id="def-calendar_use"'):]
     block = unescape(re.sub(r"<[^>]+>", " ", block[:block.index("</div>")]))
-    for part in (t.label, t.means, t.formula.strip("`"), t.answers, t.caution):
-        assert part in re.sub(r"\s+", " ", block), part
+    for part in (t.label, t.means, t.formula, t.answers, t.source, t.caution):
+        assert re.sub(r"[*`]", "", " ".join(part.split())) in re.sub(r"\s+", " ", block), part
 
 
 def test_an_unknown_term_fails_loudly(app_client):
@@ -272,35 +272,47 @@ def test_pointing_at_either_side_lights_the_other(app_client, tmp_path):
 # --------------------------------------------- the wording is GLOSSARY.md's
 
 FIELDS = {"definition": "means", "formula": "formula", "answers": "answers", "caution": "caution",
-          "status": "status", "why": "why", "source": "source"}
+          "source": "source", "status": "status", "source of the definition": "source",
+          "why it is withheld": "why", "why it is unavailable": "why"}
 
 
-def glossary_md() -> dict[str, dict[str, str]]:
-    """GLOSSARY.md, parsed on its own terms: each ### heading, and its **field:** paragraphs."""
+def glossary_md() -> dict[tuple[str, str], dict[str, str]]:
+    """GLOSSARY.md, parsed on its own terms: each ### heading under its ## section, and its **field:**
+    paragraphs, whitespace normalised. Keyed by (section, heading): OEE is both a full entry and a line in
+    the absent section."""
     text = (Path(__file__).parent.parent / "GLOSSARY.md").read_text(encoding="utf-8")
-    out = {}
-    for block in re.split(r"^### ", text, flags=re.M)[1:]:
-        head, _, body = block.partition("\n")
-        body = re.split(r"\n---|\n## ", body)[0]
-        fields = re.findall(r"\*\*(\w+):\*\*\s*(.*?)(?=\n\s*\*\*\w+:\*\*|\Z)", body, re.S)
-        out[head.strip()] = {FIELDS[k]: " ".join(v.split()) for k, v in fields}
+    out, section = {}, None
+    for chunk in re.split(r"^(## .*|### .*)$", text, flags=re.M):
+        if chunk.startswith("## "):
+            section = chunk[3:].strip()
+        elif chunk.startswith("### "):
+            head = (section, chunk[4:].strip())
+            out[head] = {}
+        elif out and not out[head]:
+            body = re.split(r"\n---\s*\n", chunk)[0]
+            for k, v in re.findall(r"\*\*([\w ]+?):\*\*\s*(.*?)(?=\n\s*\*\*[\w ]+?:\*\*|\Z)", body, re.S):
+                out[head][FIELDS[k]] = " ".join(v.split())
     return out
 
 
 def test_every_glossary_md_entry_is_defined_word_for_word():
     md = glossary_md()
-    assert len(md) == 29                                                # 26 measures + 3 deliberately absent
-    by_label = {t.label: (k, t) for k, t in GL.DEFS.items() if k not in GL.NOT_IN_GLOSSARY_MD}
-    assert set(by_label) == set(md)                                     # nothing dropped, nothing added
-    for label, fields in md.items():
-        _, t = by_label[label]
-        for name in ("means", "formula", "answers", "caution", "status", "why", "source"):
-            assert (getattr(t, name) or None) == fields.get(name), (label, name)
+    assert len(md) == 45                    # 11 time, 9 OEE, 15 cycle, 6 structure, 4 deliberately absent
+    py = {(t.section, t.label): t for t in GL.DEFS.values()}
+    assert set(py) == set(md)                                           # nothing dropped, nothing added
+    for head, fields in md.items():
+        t = py[head]
+        for name in ("means", "formula", "answers", "caution", "source", "status", "why"):
+            got = getattr(t, name)
+            assert (" ".join(got.split()) if got else None) == fields.get(name), (head, name)
 
 
 def test_the_cautions_survive():
     """The cautions are the point. Spot-check that the findings they record are there in full."""
-    assert "ADVIL in three different carton sizes shares one cycle time" in GL.DEFS["derived_ict"].caution
+    ict = " ".join(GL.DEFS["derived_ict"].caution.split())
+    assert "all four ADVIL variants return 0.54545455 s, which is 6/11 s: a rate of 6,600 cycles per hour" in ict
+    assert "FR8 ESTRADIOL is exactly 0.375 s across all 88 runs" in ict
+    assert "XL's arithmetic is correct. Its count inputs are miswired." in GL.DEFS["quality"].why
     assert "Across 1,803 shifts on all four lines, crew size has never been entered once" in GL.DEFS["labour"].why
     assert "It was reporting schedule adherence, not asset use." in GL.DEFS["calendar_use"].caution
 
@@ -329,14 +341,18 @@ def test_cross_references_link_and_their_targets_are_on_the_page(app_client):
     assert '<a class=term href="#def-performance" data-def="performance">Performance</a>' in var
     assert 'data-def-body="performance"' in h                           # the target is there to open
     run = h[h.index('data-def-body="running"'):]
-    assert '<em>small stops</em>' in run[:run.index("</div>")]          # GLOSSARY.md's emphasis kept
+    # "See *Small stops*": an italic mention of another entry becomes a link to it - in the caution itself, not
+    # only in the See also line beneath, which carries the same link
+    caution = run[run.index("<span class=k>Caution</span>"):]
+    caution = caution[:caution.index("</p>")]
+    assert 'See <a class=term href="#def-small_stops" data-def="small_stops">Small stops</a>.' in caution
 
 
 def test_formulas_render_as_code_and_absent_parts_are_not_invented(app_client):
     h = app_client.get("/products?g=month&p=2026-09").get_data(as_text=True)
     ict = h[h.index('data-def-body="derived_ict"'):]
     ict = ict[:ict.index("</div>")]
-    assert "<code>median of (ideal time ÷ run cycles)</code> across runs over 200 cycles" in ict
+    assert "<code>ideal time ÷ total cycles</code>" in ict
     run = h[h.index('data-def-body="run_h"'):]
     assert "Formula" not in run[:run.index("</div>")]                    # GLOSSARY.md gives Run h no formula
 
@@ -344,3 +360,28 @@ def test_formulas_render_as_code_and_absent_parts_are_not_invented(app_client):
 def test_no_provisional_note(app_client):
     h = app_client.get("/?g=month&p=2026-09").get_data(as_text=True)
     assert "provisional" not in h.lower() and "to be replaced" not in h
+
+
+def test_bold_and_paragraphs_survive(app_client):
+    h = app_client.get("/?g=month&p=2026-09").get_data(as_text=True)
+    cal = h[h.index('data-def-body="calendar_use"'):]
+    assert "<strong>Utilization</strong> metric, renamed here." in cal[:cal.index("</div>")]
+    oee = h[h.index('data-def-body="oee"'):]
+    oee = oee[:oee.index("</div>")]
+    caution = oee[oee.index("<span class=k>Caution</span>"):]
+    assert caution.count("<p>") == 3 and oee.count("<p>") >= 7              # four paragraphs: 1 with the label + 3
+    assert "It\nalso cannot be partially published" not in oee and "two of three factors is not an OEE." in oee
+
+
+def test_oee_is_explained_not_only_explained_away(app_client):
+    """The footer's OEE opens the full entry - definition, formula, what it answers, source - not the pointer."""
+    h = app_client.get("/line/AreaB?g=month&p=2026-09").get_data(as_text=True)
+    foot = h[h.index("<footer>"):]
+    absent = foot[foot.index("<p class=absent>"):]
+    absent = absent[:absent.index("</p>")]                          # the "Not shown, on purpose" line itself
+    assert '<a class=term href="#def-oee" data-def="oee">OEE</a>' in absent and "oee_withheld" not in absent
+    oee = foot[foot.index('data-def-body="oee"'):]
+    oee = oee[:oee.index("</div>")]
+    assert "<code>availability × performance × quality</code>" in oee and "Currently withheld on these four lines" in oee
+    for loss in ("availability_loss", "performance_loss", "quality_loss", "oee_loss"):   # Available/Performance reach them
+        assert f'data-def-body="{loss}"' in foot, loss

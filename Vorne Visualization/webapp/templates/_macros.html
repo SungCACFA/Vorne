@@ -53,6 +53,6 @@ Data runs to the last closed hour{% for d in devices %}{% if snap.history[d].las
 the hour still in progress is not included. Cache refreshed {{ snap.last_refresh|local }}.</p>
 <p>Available = running ÷ scheduled. Performance = ideal ÷ running. Both use full one-hour records only,
 where partial records distort the rate. Availability counts planned stops in the denominator, unlike the common
-OEE convention (run ÷ (run + unplanned)), so it reads lower than a textbook figure for the same hours. Calendar use = scheduled ÷ elapsed, and every hours column, use
+{{ term('oee', 'OEE') }} convention (run ÷ (run + unplanned)), so it reads lower than a textbook figure for the same hours. Calendar use = scheduled ÷ elapsed, and every hours column, use
 <em>all</em> closed records, including the long overnight not-scheduled blocks. Down h = unplanned stop.</p>
 {%- endmacro %}
