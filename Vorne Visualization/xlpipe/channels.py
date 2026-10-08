@@ -29,6 +29,10 @@ class ChannelSpec:
     has_end_time: bool = True
     keep_raw_day: bool = False  # store production_day_number_raw (events can span days)
     extra_fields: tuple[str, ...] = ()  # agreed additions beyond the brief's set
+    # Columns added after rows were already cached. The upsert may fill them where they are still NULL
+    # on a row whose sync_id has not changed (a re-pull of unchanged history), and only them: nothing
+    # that is already stored is ever overwritten by an older or equal version.
+    backfill_columns: tuple[str, ...] = ()
 
     @property
     def bookkeeping(self) -> tuple[str, ...]:
@@ -70,7 +74,11 @@ _RUN_FIELDS = (
 _HOURLY_NUM = ("in_count", "good_count", "reject_count", *_TIMES, "target_count")
 _RUN_NUM = ("duration", "run_time", "unplanned_stop_time", "planned_stop_time", "in_count",
             "good_count", "ideal_time", "ideal_cycle_time", "target_count", "target_cycles",
-            "run_cycles", "small_stops")
+            "run_cycles", "small_stops", "total_cycles", "partial_cycles")
+# Vorne: Ideal Time = Ideal Cycle Time x Total Cycles, Total Cycles = run cycles + small stops + partial
+# cycles. Dividing ideal time by run cycles alone inflated the derived ICT (13% on KWELLADA). Added
+# 2026-10-08, after the cache already held history: hence backfill_columns.
+_CYCLE_FIELDS = ("total_cycles", "partial_cycles")
 
 SPECS: dict[str, ChannelSpec] = {
     s.channel: s
@@ -104,6 +112,7 @@ SPECS: dict[str, ChannelSpec] = {
                    text=("part", "job"), num=_RUN_NUM),
             rename={"duration": "duration_s"},
             keep_raw_day=True,
+            extra_fields=_CYCLE_FIELDS, backfill_columns=_CYCLE_FIELDS,
         ),
         ChannelSpec(
             "job", "job_run", "job_event_id", _RUN_FIELDS,
@@ -111,6 +120,7 @@ SPECS: dict[str, ChannelSpec] = {
                    text=("part", "job"), num=_RUN_NUM),
             rename={"duration": "duration_s"},
             keep_raw_day=True,
+            extra_fields=_CYCLE_FIELDS, backfill_columns=_CYCLE_FIELDS,
         ),
         ChannelSpec(
             "quality_event", "quality_event", "record_id",

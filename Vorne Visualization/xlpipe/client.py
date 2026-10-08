@@ -127,8 +127,49 @@ class ReplayClient:
     def get_json(self, path: str, params: dict[str, str] | None = None) -> Any:
         f = self.dir / fixture_name(path, params)
         if not f.exists():
+            supplemented = self._supplemented(path, params)
+            if supplemented is not None:
+                return supplemented
             raise DeviceHTTPError(404, path, f"not recorded ({f.name})")
         record = json.loads(f.read_text(encoding="utf-8"))
         if record.get("status", 200) >= 400:
             raise DeviceHTTPError(record["status"], path, str(record.get("response")))
         return record["response"]
+
+    # Fields added to a channel after the recording was made, and read later by event id into
+    # cycles_supplement.json. A request for them is answered from the original recording (the same request
+    # without them), with their values filled in by event id - None where an event is not in the supplement.
+    SUPPLEMENTED = ("total_cycles", "partial_cycles")
+
+    def _supplemented(self, path: str, params: dict[str, str] | None) -> Any:
+        m = re.fullmatch(r"api/v0/channels/(part|job)/events(?:/current|/previous)?", path.strip("/"))
+        fields = (params or {}).get("fields", "").split(",")
+        added = [x for x in fields if x in self.SUPPLEMENTED]
+        sup_file = self.dir / "cycles_supplement.json"
+        if not m or not added or not sup_file.exists():
+            return None
+        base = {**params, "fields": ",".join(x for x in fields if x not in added)}
+        f = self.dir / fixture_name(path, base)
+        if not f.exists():
+            return None
+        record = json.loads(f.read_text(encoding="utf-8"))
+        if record.get("status", 200) >= 400:
+            raise DeviceHTTPError(record["status"], path, str(record.get("response")))
+        channel = m.group(1)
+        sup = json.loads(sup_file.read_text(encoding="utf-8")).get(channel, {})
+        base_fields = base["fields"].split(",")
+        key_at = base_fields.index(f"{channel}_event_id")
+        response = json.loads(json.dumps(record["response"]))      # a copy
+        rows = []
+        for row in response["data"]["events"]:
+            have = dict(zip(base_fields, row))
+            extra = sup.get(str(int(row[key_at])) if row[key_at] is not None else "", {})
+            # Only the same run, whole: the same version (sync_id), and the same run cycles - a request filtered
+            # by production day returns a run clipped to that window, with prorated cycles.
+            for k in ("sync_id", "run_cycles"):
+                if k in have and extra.get(k) is not None and extra[k] != have[k]:
+                    extra = {}
+                    break
+            rows.append([have[x] if x in have else extra.get(x) for x in fields])
+        response["data"]["events"] = rows
+        return response

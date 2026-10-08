@@ -272,7 +272,7 @@ def test_pointing_at_either_side_lights_the_other(app_client, tmp_path):
 # --------------------------------------------- the wording is GLOSSARY.md's
 
 FIELDS = {"definition": "means", "formula": "formula", "answers": "answers", "caution": "caution",
-          "status": "status", "why": "why"}
+          "status": "status", "why": "why", "source": "source"}
 
 
 def glossary_md() -> dict[str, dict[str, str]]:
@@ -294,7 +294,7 @@ def test_every_glossary_md_entry_is_defined_word_for_word():
     assert set(by_label) == set(md)                                     # nothing dropped, nothing added
     for label, fields in md.items():
         _, t = by_label[label]
-        for name in ("means", "formula", "answers", "caution", "status", "why"):
+        for name in ("means", "formula", "answers", "caution", "status", "why", "source"):
             assert (getattr(t, name) or None) == fields.get(name), (label, name)
 
 

@@ -260,7 +260,7 @@ CREATE TABLE IF NOT EXISTS open_event (
 -- the sync role. The sap_* columns are writable only by the app role.
 CREATE TABLE IF NOT EXISTS part_standard (
     part             text PRIMARY KEY,
-    ideal_cycle_time double precision,          -- s/cycle: median ideal_time/run_cycles
+    ideal_cycle_time double precision,          -- s/cycle: median ideal_time/total cycles
     ict_stddev       double precision,
     sample_runs      int,
     ict_unstable     boolean GENERATED ALWAYS AS (ict_stddev > 0.05) STORED,
@@ -434,6 +434,8 @@ CREATE TABLE IF NOT EXISTS part_run (
     target_cycles         double precision,
     run_cycles            double precision,
     small_stops           double precision,
+    total_cycles          double precision,   -- run cycles + small stops + partial cycles (device's own)
+    partial_cycles        double precision,
     config_epoch          int    NOT NULL DEFAULT 1,
     deleted_at            timestamptz,
     first_loaded_at       timestamptz NOT NULL DEFAULT now(),
@@ -465,6 +467,8 @@ CREATE TABLE IF NOT EXISTS job_run (
     target_cycles         double precision,
     run_cycles            double precision,
     small_stops           double precision,
+    total_cycles          double precision,   -- run cycles + small stops + partial cycles (device's own)
+    partial_cycles        double precision,
     config_epoch          int    NOT NULL DEFAULT 1,
     deleted_at            timestamptz,
     first_loaded_at       timestamptz NOT NULL DEFAULT now(),
@@ -600,15 +604,16 @@ CREATE TRIGGER device_seed_epoch
 
 -- ========================================================= part standards
 
--- Derived ideal cycle time per part, over runs with run_cycles > 200.
+-- Derived ideal cycle time per part (Vorne's Avg. Ideal Cycle Time: ideal time / total cycles, since
+-- Ideal Time = Ideal Cycle Time x Total Cycles), over runs with run_cycles > 200.
 -- Called by the sync at the end of each run. Never touches the manually
 -- maintained columns (sap_*, expected_count_per_cycle).
 CREATE OR REPLACE FUNCTION refresh_part_standard() RETURNS int
 LANGUAGE sql AS $$
     WITH derived AS (
         SELECT part,
-               percentile_cont(0.5) WITHIN GROUP (ORDER BY ideal_time / run_cycles) AS ict,
-               stddev_samp(ideal_time / run_cycles)                                AS sd,
+               percentile_cont(0.5) WITHIN GROUP (ORDER BY ideal_time / COALESCE(total_cycles, run_cycles + COALESCE(small_stops, 0) + partial_cycles, run_cycles + COALESCE(small_stops, 0))) AS ict,
+               stddev_samp(ideal_time / COALESCE(total_cycles, run_cycles + COALESCE(small_stops, 0) + partial_cycles, run_cycles + COALESCE(small_stops, 0))) AS sd,
                count(*)::int                                                       AS n
           FROM part_run
          WHERE deleted_at IS NULL AND part IS NOT NULL AND run_cycles > 200
@@ -772,7 +777,8 @@ SELECT
     sum(r.ideal_time) / NULLIF(sum(r.run_time), 0)        AS efficiency,
     (sum(r.ideal_time) - sum(r.run_time)) / 3600.0        AS variance_h,
     sum(r.run_cycles)                                     AS run_cycles,
-    sum(r.run_time) / NULLIF(sum(r.run_cycles), 0)        AS actual_s_per_cycle,
+    sum(COALESCE(r.total_cycles, r.run_cycles + COALESCE(r.small_stops, 0) + r.partial_cycles, r.run_cycles + COALESCE(r.small_stops, 0))) AS total_cycles,
+    sum(r.run_time) / NULLIF(sum(COALESCE(r.total_cycles, r.run_cycles + COALESCE(r.small_stops, 0) + r.partial_cycles, r.run_cycles + COALESCE(r.small_stops, 0))), 0) AS actual_s_per_cycle,
     ps.ideal_cycle_time                                   AS derived_ict_s_per_cycle,
     ps.ict_stddev,
     ps.sample_runs                                        AS ict_sample_runs,

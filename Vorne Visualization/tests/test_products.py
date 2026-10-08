@@ -2,12 +2,15 @@
 editing and CSV. Expected values are literals derived independently from
 the raw fixtures (see test_counts_preserved for the method).
 
+Cycles: ideal time is the configured ICT x TOTAL cycles (run + small stops + partial; Vorne), so the
+derived ICT divides by total cycles. Total and partial cycles were read from the devices on 2026-10-08
+into cycles_supplement.json (the original recording predates those fields).
+
 FR8 ESTRADIOL, runs starting in September 2026 production days: 5 runs,
-run 232,733.922768 s, 211,627 cycles, ideal 79,883.625 s, good 395,213.
-Its derived ICT on FR8: median 0.37701477289352836 over 88 runs of >200
-cycles (mean would be 0.37717...). OTRIVIN across the fleet: median
-0.9301384408908945, mean 1.487008... - so a mean-for-median swap is
-unmistakable there.
+run 232,733.922768 s, 211,627 run cycles, 213,023 total cycles, ideal 79,883.625 s.
+Its derived ICT on FR8: exactly 0.375 on all 88 runs of >200 run cycles (spread 0; by run cycles it read
+0.37701, inflated by the small stops). OTRIVIN across the fleet: median 0.85714286 (AreaB 6/7 s), mean
+1.44156 (AreaD runs at 15/7 s) - so a mean-for-median swap is unmistakable there.
 """
 
 import csv
@@ -20,8 +23,8 @@ import pytest
 from conftest import client_for
 from webapp import data as D
 
-ACTUAL_S_PER_CYCLE = 232733.92276800002 / 211627.0       # 1.0997364...
-FR8_ESTRADIOL_ICT = 0.37701477289352836
+ACTUAL_S_PER_CYCLE = 232733.92276800002 / 213023.0       # 1.0925296..., by total cycles
+FR8_ESTRADIOL_ICT = 0.375
 
 
 def standards_row(html: str, part: str, dev: str) -> list[str]:
@@ -42,13 +45,22 @@ def test_device_ict_is_the_median_not_the_mean(replayed_cache):
     got = D.device_ict(replayed_cache)[("FR8", "ESTRADIOL")]
     assert got["ict"] == pytest.approx(FR8_ESTRADIOL_ICT, rel=1e-12)
     assert got["n"] == 88
-    assert got["sd"] == pytest.approx(0.0012064973917539441, rel=1e-9)
+    assert got["sd"] == pytest.approx(0.0, abs=1e-12)          # one configured value, recovered exactly
+    assert got["basis"] == {"device": 88}                      # the device's own total_cycles, every run
+
+
+def test_device_ict_is_the_median_where_runs_differ(replayed_cache):
+    """By total cycles ESTRADIOL is one exact value, so mean and median agree there. FR8 ABREVAi_3G differs
+    run to run (reconfigured 13 Mar, three odd runs): median 0.65607, mean 0.68810 over 12 whole runs."""
+    got = D.device_ict(replayed_cache)[("FR8", "ABREVAi_3G")]
+    assert got["n"] == 12
+    assert got["ict"] == pytest.approx(0.6560659385641903, rel=1e-12)       # the mean would be 0.68810
 
 
 def test_part_standard_ict_is_the_median_not_the_mean(replayed_cache):
     v = sqlite3.connect(replayed_cache).execute(
         "SELECT ideal_cycle_time, sample_runs FROM part_standard WHERE part='OTRIVIN'").fetchone()
-    assert v[0] == pytest.approx(0.9301384408908945, rel=1e-12)     # the mean would be 1.487
+    assert v[0] == pytest.approx(0.8571428600000027, rel=1e-12)     # the mean would be 1.442
     assert v[1] == 11
 
 
@@ -65,9 +77,9 @@ def test_estradiol_fr8_september_row(app_client):
     cells = standards_row(html, "ESTRADIOL", "FR8")
     line, runs, ict, epc, sap, actual, vs_ict, vs_sap, run_h, earned_h, variance, per_piece = cells
     assert (line, runs) == ("FR8", "5")
-    assert ict == "0.377"
-    assert actual == "1.100"
-    assert vs_ict == "2.92×"            # actual / derived; inverted would read 0.34×
+    assert ict == "0.375"
+    assert actual == "1.093"            # run time / total cycles
+    assert vs_ict == "2.91×"            # actual / derived; inverted would read 0.34×
     assert run_h == "64.6" and earned_h == "22.2"
     assert variance == "42.5"           # (run - ideal) / 3600
     assert vs_sap == "no SAP standard"
@@ -78,8 +90,8 @@ def test_estradiol_fr8_september_row(app_client):
 def test_vs_derived_ratio_direction(app_client):
     """Slower than standard reads above 1 and is marked 'over'."""
     html = app_client.get("/products?g=month&p=2026-09").get_data(as_text=True)
-    assert f"{ACTUAL_S_PER_CYCLE / FR8_ESTRADIOL_ICT:.2f}×" == "2.92×"
-    assert '<span class="over">2.92×</span>' in html
+    assert f"{ACTUAL_S_PER_CYCLE / FR8_ESTRADIOL_ICT:.2f}×" == "2.91×"
+    assert '<span class="over">2.91×</span>' in html
 
 
 # -------------------------------------------------------------- SAP units
@@ -110,12 +122,12 @@ def test_sap_comparison_end_to_end(cache_copy, tmp_path):
     assert c.post("/api/part_standard", json={"part": "ESTRADIOL", "field": "epc", "value": "2"}).get_json()["ok"]
     html = c.get(url).get_data(as_text=True)
     cells = standards_row(html, "ESTRADIOL", "FR8")
-    # SAP 2400/h = 1.5 s/piece; x 2 pieces/cycle = 3.0 s/cycle; actual 1.0997 -> 0.37x
+    # SAP 2400/h = 1.5 s/piece; x 2 pieces/cycle = 3.0 s/cycle; actual 1.0925 -> 0.36x
     assert 'class=epc data-part="ESTRADIOL" value="2"' in html
     assert 'class=sap data-part="ESTRADIOL" value="1.5"' in html     # shown in the page unit, s/piece
-    assert cells[7] == "0.37×"
-    # earned at SAP: 211,627 cycles x 3.0 s = 176.4 h; the page shows >=100 h without decimals
-    assert "Earned h, SAP" in html and cells[10] == "176"
+    assert cells[7] == "0.36×"
+    # earned at SAP: 213,023 total cycles x 3.0 s = 177.5 h; the page shows >=100 h without decimals
+    assert "Earned h, SAP" in html and cells[10] == "178"
 
 
 # --------------------------------------------------------- per-piece gating
@@ -200,4 +212,4 @@ def test_csv_import_reports_bad_lines_and_loads_the_rest(cache_copy, tmp_path):
 def test_csv_export_columns(app_client):
     rows = list(csv.DictReader(io.StringIO(app_client.get("/products/standards.csv").get_data(as_text=True))))
     otrivin = next(r for r in rows if r["part"] == "OTRIVIN")
-    assert float(otrivin["derived_ideal_cycle_time_s_per_cycle"]) == pytest.approx(0.9301384408908945)
+    assert float(otrivin["derived_ideal_cycle_time_s_per_cycle"]) == pytest.approx(0.8571428600000027)

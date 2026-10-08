@@ -21,6 +21,8 @@
 {%- if t.caution %}
 <p><span class=k>Caution</span> {{ t.caution|md }}</p>{% endif %}
 {%- endif %}
+{%- if t.source %}
+<p class=src><span class=k>Source</span> {{ t.source|md }}</p>{% endif %}
 {%- if t.see %}
 <p class=see><span class=k>See also</span> {% for s in t.see %}<a class=term href="#def-{{ s }}" data-def="{{ s }}">{{ glossary_label(s) }}</a>{{ ', ' if not loop.last }}{% endfor %}</p>{% endif %}</dd>
 </div>

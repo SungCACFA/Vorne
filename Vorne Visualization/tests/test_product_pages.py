@@ -95,8 +95,10 @@ def test_reconfigurations_on_the_recording(replayed_cache):
                       ("FR8", "ESTRADIOL"), ("AreaD", "ELYXYB_4k8ML_TRADE")):
         lv = D.ict_levels(D.ict_history(replayed_cache, dev, part))
         found[part] = [(c["start"].date().isoformat(), f"{c['shift']:+.0%}") for c in lv["changes"]], len(lv["outliers"])
-    assert found == {"OTRIVIN": ([("2026-06-19", "-4%")], 0), "REGAINE_5b_60ML_SINGLES": ([("2026-04-20", "-11%")], 0),
-                     "ABREVAi_3G": ([("2026-03-13", "-10%")], 3), "ESTRADIOL": ([], 0), "ELYXYB_4k8ML_TRADE": ([], 1)}
+    # By total cycles. AreaB OTRIVIN's old "19 Jun, -4%" and ELYXYB's one-run outlier were small stops
+    # varying between runs: by total cycles every run of each is the same value. Real reconfigurations stay.
+    assert found == {"OTRIVIN": ([], 0), "REGAINE_5b_60ML_SINGLES": ([("2026-04-20", "-10%")], 0),
+                     "ABREVAi_3G": ([("2026-03-13", "-10%")], 3), "ESTRADIOL": ([], 0), "ELYXYB_4k8ML_TRADE": ([], 0)}
 
 
 # ------------------------------------------------------------ the page
@@ -106,7 +108,8 @@ def test_where_it_runs(app_client):
     t = text(h, "<h2>Where it runs", "<h2>Every run")
     assert re.search(r"AreaB 8 52\.4 28\.0 0\.53 34\.5", t)
     assert re.search(r"AreaD 11 132 88\.9 0\.67 93\.5", t)
-    assert "reconfigured" in t                               # AreaB, 19 Jun
+    assert "0.857" in t and "2.143" in t                     # ICT now: AreaB 6/7 s, AreaD 15/7 s
+    assert "reconfigured" not in t                           # the old "19 Jun" was an artefact of run cycles
 
 
 def test_open_run_is_named_and_left_out(app_client):
@@ -142,9 +145,10 @@ def test_reasons_are_this_parts(app_client):
 
 
 def test_ict_reconfiguration_is_marked_and_explained(app_client):
-    h = app_client.get("/product/OTRIVIN?g=ytd&p=2026").get_data(as_text=True)
-    assert "class=changelab>reconfigured 19 Jun: 0.929 to 0.889 s (-4%)</text>" in h
-    assert re.search(r"AreaB: reconfigured on\s+19 Jun 2026", h)
+    """AreaE REGAINE_5b_60ML_SINGLES: 0.667 s on its first four runs, 0.600 s from 20 Apr - a real change."""
+    h = app_client.get("/product/REGAINE_5b_60ML_SINGLES?g=ytd&p=2026").get_data(as_text=True)
+    assert "class=changelab>reconfigured 20 Apr: 0.667 to 0.600 s (-10%)</text>" in h
+    assert re.search(r"AreaE: reconfigured on\s+20 Apr 2026", h)
     assert "mixes both values" in h
 
 

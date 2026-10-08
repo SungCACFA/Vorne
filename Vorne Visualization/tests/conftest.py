@@ -48,7 +48,10 @@ def recorded_events(host: str, channel: str) -> list[dict]:
     for f in (FIXTURES / host).glob(f"api_v0_channels_{channel}_events__*.json"):
         rec = json.loads(f.read_text(encoding="utf-8"))
         params = rec["request"]["params"]
-        if rec["status"] != 200 or "group" in params:
+        # Skip aggregates (group=) and the re-sync window (production_day_number[gte]): the device returns a
+        # run that a window request catches clipped to the window, with prorated cycles and times, at the
+        # same sync_id - not the record the device holds.
+        if rec["status"] != 200 or "group" in params or any(k.startswith("production_day_number[") for k in params):
             continue
         fields = params["fields"].split(",")
         body = rec["response"]

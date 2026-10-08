@@ -49,7 +49,7 @@ when there are, they go in `.env`, which is git-ignored.
 | `python -m webapp [--port N]` | The app. Reads the cache on every request, so a refresh shows on the next page load. Also runs the live writer for `/live` (`--no-live-writer` to leave it to a separate process). |
 | `python -m xlpipe live [--interval S]` | The live writer on its own: every device's real-time data into `current_state`, every 5 s. One writer at a time. |
 | `python -m webapp export [--out FILE] [--keep]` | A self-contained, read-only HTML snapshot of every page, product page and period (≈3 min, ≈2.6 MB). Deletes earlier exports in the same folder unless `--keep`. See below. |
-| `python -m pytest` | 396 tests, no device needed (≈4–7 min, most of it the export tests). |
+| `python -m pytest` | 405 tests, no device needed (≈4–7 min, most of it the export tests). |
 | `python tests/mutation_check.py` | Would the tests notice if the code were wrong? See Tests. |
 | `python preflight.py` | When there is a database path: DNS, TCP 5432, TLS, auth, permissions, latency, as separate steps. |
 
@@ -181,6 +181,12 @@ before when a third shift runs, otherwise 07:00. An unscheduled night stays with
 
 ## Device API behaviours worth knowing
 
+- **A production-day-filtered request returns runs clipped to the window.** Asked for runs from production day N,
+  the device returns a run that began earlier with its start moved to the window's start and its cycles and times
+  prorated, at the same `sync_id` as the whole run (FR8 run 291: 108,107 of 122,727 run cycles). The sync's window
+  pass therefore never overwrites a stored run (same `sync_id`), may not fill a newly added column (only a re-pull
+  with the same run cycles may), and anything reading recorded responses must skip window requests.
+
 Verified on firmware 2.22.14.2. Trust these over the vendor PDF.
 
 - `/events` needs `fields` and returns positional arrays in that order; a length mismatch is an error, never a guess.
@@ -220,11 +226,21 @@ time run by run, with reconfigurations marked; changeover cost in and out of it.
   but one (FR8 ESTRADIOL from 21 Sep 2026: the device's total is 13 s higher).
 - The event's own `part` field is not used for runs: it also carries the still-open run (AreaD's OTRIVIN open since
   25 Aug reads 233 run h by that field against 132 h of closed runs). Open runs are named and counted nowhere.
-- **ICT reconfiguration**: derived ICT = ideal time ÷ run cycles, runs over 200 cycles, all usable history. A run more
-  than `ict_change_tolerance` (3%) off its level that the next run confirms starts a new level; one the next run
-  does not confirm is a single outlier. On the recording: AreaB OTRIVIN 19 Jun (−4%), AreaE REGAINE_5b_60ML_SINGLES
-  20 Apr (−11%), FR8 ABREVAi_3G 13 Mar (−10%), AreaB OMNARIS_120P 30 Mar (−53%). The products list's derived ICT
-  is a median over all history, so it mixes both levels where a line was reconfigured; that row says so.
+- **Total cycles, not run cycles.** Vorne: Ideal Time = Ideal Cycle Time × Total Cycles, and Total Cycles = run
+  cycles + small stops + partial cycles. So the derived ICT is ideal time ÷ total cycles (Vorne's Avg. Ideal Cycle
+  Time), and actual s/cycle and SAP-earned hours divide by total cycles too. The device's own `total_cycles` is
+  used (it equals the sum on all 534 runs); without it, the sum; without partial cycles, run + small stops, and the
+  products page says which. Dividing by run cycles alone inflated the ICT by up to 13% (KWELLADA_100ML) and made
+  it look unstable: by total cycles each part's runs give one exact configured value (FR8 ESTRADIOL 0.375 s on all
+  88; every AreaB part 0.8571 s, 6/7; all four ADVIL variants on FR8 0.54545455). "vs derived" ratios barely moved
+  (median 0.00%, range −11% to +2%), because actual s/cycle moved with them.
+- **ICT reconfiguration**: derived ICT run by run, runs over 200 run cycles, all usable history. A run more than
+  `ict_change_tolerance` (3%) off its level that the next run confirms starts a new level; one the next run does
+  not confirm is a single outlier. Three are real: AreaB OMNARIS_120P 30 Mar (2.000 → 0.857 s), FR8 ABREVAi_3G
+  13 Mar and AreaE REGAINE_5b_60ML_SINGLES 20 Apr (0.667 → 0.600 s, −10% each). The "reconfiguration" AreaB OTRIVIN
+  showed on 19 Jun was an artefact of dividing by run cycles: small stops differed between its runs. The products
+  list's derived ICT is a median over all history, so it mixes both levels where a line was reconfigured; that row
+  says so.
 
 **Product filter on the line page** (`?part=`): hour records naming the part (a changeover hour counts for both
 parts) and the state events the device attributes to it, open run included. The heatmap shows other products' time
@@ -356,7 +372,7 @@ no server and fetches nothing: open it in Edge, Chrome or Firefox, or attach it 
 
 ## Tests
 
-`python -m pytest` — 396 tests, four to seven minutes (most of it the export tests), no device. Fixtures in `tests/fixtures/devices/` (16 MB) are a
+`python -m pytest` — 405 tests, four to seven minutes (most of it the export tests), no device. Fixtures in `tests/fixtures/devices/` (16 MB) are a
 recorded first-run backfill of all four devices; the end-to-end tests replay them through the real sync into a fresh
 cache.
 
@@ -385,11 +401,12 @@ in that code would be compared with itself and pass.
 | `test_explain.py` | Every measure asked for defined in full; the page showing the module's wording; an unknown term failing loudly; each page marking its measures and listing exactly those definitions; each chart's tooltip text with literals; and in headless Edge: hover, the native title removed, the edge flip, tap and second tap, open on Enter with focus moving in, Escape returning focus, click outside closing. |
 | `test_sticky.py` | The bar directly under the nav on every page (the live status line on /live), the rules, and in headless Edge at 1280 and 390 px: band under 90 px, nav at 0 with the bar exactly under it, only the nav on a phone, the shadow only once floating, the hour-table jump landing below the band. The export's band is checked in `test_export.py`. |
 | `test_live.py` | Each device's recorded reading, no counts, a failed read keeping the last values, a slow device not delaying the rest, one writer, the page reading only the table, never-run, stale by age and by failure, never-read panels, the JSON endpoint, counted vs wall-clock time; and in headless Edge: a reading turning stale as it ages, a failed poll keeping values with ages climbing, an in-place update with no reload, polling paused while hidden and resumed at once. |
+| `test_cycles.py` | Total cycles: an old cache gaining the columns and re-pulling only those channels; the backfill filling a new column, never overwriting, never from an older version or a clipped window slice; device total preferred, then the sum, then run + small stops; a cache without the columns still reading; replay filling whole runs only. |
 | `test_product_pages.py` | Runs and their stops against part_run, ICT levels and outliers, the reconfigurations on the recording, every product-page section with literal figures, part links, the line page's product filter. |
 
 ### Mutation check
 
-`python tests/mutation_check.py` applies, one at a time, 127 deliberate bugs of the kind a refactor or a "helpful" fix
+`python tests/mutation_check.py` applies, one at a time, 136 deliberate bugs of the kind a refactor or a "helpful" fix
 could introduce — clamping a count, inverting a ratio, taking a mean for a median, starting weeks on Sunday — runs
 the suite against each, and restores the original. A bug the suite does not notice is a gap. It takes several minutes;
 `--list` shows the bugs, and numbers run a subset.

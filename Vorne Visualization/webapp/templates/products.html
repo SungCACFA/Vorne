@@ -21,7 +21,7 @@
 {% endfor %}
 {% for r in closed[:100] %}
 {%- set d = ict.get((r.device_id, r.part), {}) -%}
-{%- set act = (r.run_time / r.run_cycles) if r.run_cycles else none -%}
+{%- set act = (r.run_time / r.cycles_total) if r.cycles_total else none -%}
 <tr><th>{{ r.part|partlink }}</th><td class=left>{{ r.job or '—' }}</td><td class=left>{{ r.device_id }}</td>
 <td class="left nw">{{ r.start|local }}</td>
 <td>{{ ((r.end - r.start).total_seconds() if r.end and r.start else 0)|elapsed }}</td>
@@ -41,8 +41,15 @@
 {% block body %}
 <h2>Standards and variance</h2>
 <p class=note>One row per part per line, for runs that started in this period. The derived ideal cycle time is the
-median of ideal time ÷ run cycles over that line's runs of more than 200 cycles, all usable history; it is per
-machine <em>cycle</em>. Pieces per cycle and the SAP standard are yours to enter. With pieces per cycle filled in, the
+median of ideal time ÷ total cycles over that line's runs of more than 200 run cycles, all usable history; it is per
+machine <em>cycle</em>. Total cycles is the device's own: run cycles + small stops + partial cycles, the count its
+ideal time is built from (Vorne: Ideal Time = Ideal Cycle Time × Total Cycles); actual s/cycle uses it too.
+{%- set nb = cycles_basis.values()|sum %}{% if nb %} <span data-cycles-basis>{% if cycles_basis.get('device', 0) == nb %}Total cycles
+here are the device's own, on all {{ '{:,}'.format(nb) }} runs.{% else %}Total cycles here: the device's own on
+{{ '{:,}'.format(cycles_basis.get('device', 0)) }} runs{% if cycles_basis.get('computed') %}; computed as run + small stops +
+partial cycles on {{ '{:,}'.format(cycles_basis['computed']) }}{% endif %}{% if cycles_basis.get('without partial cycles') %};
+<strong>run + small stops only, partial cycles unknown, on {{ '{:,}'.format(cycles_basis['without partial cycles']) }}</strong>
+(refresh the cache to read them){% endif %}.{% endif %}</span>{% endif %} Pieces per cycle and the SAP standard are yours to enter. With pieces per cycle filled in, the
 SAP per-piece standard converts to per cycle and can be compared. <strong>{{ term('run_h') }}</strong> is cycling time only: time the line was cycling, including slow cycles and {{ term('small_stops', 'small stops') }} (any cycle shorter than the down threshold), but no down time and no planned stops.</p>
 
 {% if export %}<p class=note><strong>Read-only snapshot.</strong> SAP standards and pieces per cycle are shown as

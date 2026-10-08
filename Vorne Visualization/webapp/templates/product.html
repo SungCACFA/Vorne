@@ -24,7 +24,7 @@ down + planned) within its runs, the site's convention (planned stops count agai
 Down hours here are the device's own, implausible stops included; the charts below leave them out.{% endif %}</p>
 <table><thead><tr><th>Line</th><td>Runs</td><td>{{ term('run_h') }}</td><td>{{ term('down', 'Down h') }}</td><td>{{ term('down_per_run', 'Unplanned h') }}<small class=f>per run h</small></td>
 <td>{{ term('planned', 'Planned h') }}</td><td>{{ term('available') }}<small class=f>within its runs</small></td><td>{{ term('performance') }}<small class=f>ideal ÷ run</small></td>
-<td title="median ideal_time ÷ run_cycles, runs over 200 cycles, the current configuration level">ICT now<small class=f>s per cycle</small></td></tr></thead>
+<td title="median ideal time ÷ total cycles, runs over 200 run cycles, the current configuration level">ICT now<small class=f>s per cycle</small></td></tr></thead>
 <tbody>
 {% for l in lines %}
 <tr><th><a class=lnk href="{{ url_for('line', dev=l.dev) }}{{ win.query(part=part) }}">{{ l.dev }}</a></th>

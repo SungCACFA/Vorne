@@ -29,6 +29,7 @@ class Term:
     why: str | None = None
     see: tuple[str, ...] = ()        # other entries this one refers to
     section: str = ""
+    source: str | None = None        # where the definition comes from (Vorne Vocab, TN000406, the API, device data)
 
 
 T, C, S, A = "Time measures", "Cycle and output measures", "Structure and context", "Measures deliberately absent"

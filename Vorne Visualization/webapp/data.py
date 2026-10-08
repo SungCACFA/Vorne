@@ -384,6 +384,25 @@ SAP_UNITS = (("s_per_piece", "Seconds per piece"), ("pieces_per_hour", "Pieces p
              ("hours_per_thousand", "Hours per 1,000"))
 
 
+def cycles_sql(db: sqlite3.Connection, table: str = "part_run", alias: str = "x") -> tuple[str, str]:
+    """SQL for a run's total cycles, and for where that number came from.
+
+    Vorne: Ideal Time = Ideal Cycle Time x Total Cycles, and Total Cycles = run cycles + small stops +
+    partial cycles. So every per-cycle figure divides by total cycles, not run cycles (which inflated the
+    derived ICT by up to 13%). The device's own total_cycles is preferred; without it, the sum of its
+    parts; without partial cycles either, run cycles + small stops, and the basis says so. A cache not yet
+    refreshed since the columns were added has neither, and gets the last."""
+    p = f"{alias}." if alias else ""
+    have = {r[1] for r in db.execute(f"PRAGMA table_info({table})")}
+    without = f"{p}run_cycles + COALESCE({p}small_stops, 0)"
+    if "total_cycles" not in have:
+        return f"({without})", "'without partial cycles'"
+    total = f"COALESCE({p}total_cycles, {without} + {p}partial_cycles, {without})"
+    basis = (f"CASE WHEN {p}total_cycles IS NOT NULL THEN 'device' WHEN {p}partial_cycles IS NOT NULL "
+             f"THEN 'computed' ELSE 'without partial cycles' END")
+    return total, basis
+
+
 def from_s_per_piece(v: float | None, unit: str) -> float | None:
     if v is None:
         return None
@@ -397,18 +416,23 @@ def standards(cache_path) -> dict[str, dict]:
 
 
 def device_ict(cache_path) -> dict[tuple[str, str], dict]:
-    """Derived ideal cycle time per (device, part): median and spread of
-    ideal_time / run_cycles over that device's runs with run_cycles > 200."""
+    """Derived ideal cycle time per (device, part): median and spread of ideal_time / total cycles (Vorne's
+    Avg. Ideal Cycle Time) over that device's runs with more than 200 run cycles, and how each run's total
+    cycles was known (see cycles_sql)."""
     import statistics
+    from collections import Counter
 
     per: dict[tuple[str, str], list[float]] = {}
+    basis: dict[tuple[str, str], Counter] = {}
     with closing(_ro(cache_path)) as db:
-        for dev, part, ict in db.execute(
-                "SELECT device_id, part, ideal_time / run_cycles FROM part_run "
-                "WHERE deleted_at IS NULL AND part IS NOT NULL AND run_cycles > 200"):
+        total, how = cycles_sql(db, alias="")
+        for dev, part, ict, b in db.execute(
+                f"SELECT device_id, part, ideal_time / {total}, {how} FROM part_run "
+                f"WHERE deleted_at IS NULL AND part IS NOT NULL AND run_cycles > 200 AND {total} > 0"):
             per.setdefault((dev, part), []).append(ict)
-    return {k: {"ict": statistics.median(v), "sd": statistics.stdev(v) if len(v) > 1 else None, "n": len(v)}
-            for k, v in per.items()}
+            basis.setdefault((dev, part), Counter())[b] += 1
+    return {k: {"ict": statistics.median(v), "sd": statistics.stdev(v) if len(v) > 1 else None, "n": len(v),
+                "basis": dict(basis[k])} for k, v in per.items()}
 
 
 def runs(cache_path, table: str, dev: str, lo: int, hi: int) -> list[dict]:
@@ -417,8 +441,10 @@ def runs(cache_path, table: str, dev: str, lo: int, hi: int) -> list[dict]:
     key = "part_event_id" if table == "part_run" else "job_event_id"
     with closing(_ro(cache_path)) as db:
         db.row_factory = sqlite3.Row
+        total, how = cycles_sql(db, table)
         got = db.execute(
-            f"SELECT x.*, {key} AS event_key, COALESCE(e.counts_trusted, 0) AS counts_trusted "
+            f"SELECT x.*, {key} AS event_key, COALESCE(e.counts_trusted, 0) AS counts_trusted, "
+            f"{total} AS cycles_total, {how} AS cycles_basis "
             f"FROM {table} x {_USABLE}", (dev, lo, hi)).fetchall()
     out = []
     for r in got:
@@ -705,9 +731,10 @@ def part_runs(cache_path, dev: str, lo: int, hi: int, exclude_ids=()) -> list[di
 
     excl = set(exclude_ids or ())
     with closing(_ro(cache_path)) as db:
+        total, _ = cycles_sql(db)
         runs = db.execute(
             f"SELECT part, job, start_time, end_time, run_time, unplanned_stop_time, planned_stop_time, ideal_time, "
-            f"run_cycles, production_day_number FROM part_run x {_USABLE} AND end_time IS NOT NULL "
+            f"run_cycles, production_day_number, {total} FROM part_run x {_USABLE} AND end_time IS NOT NULL "
             f"ORDER BY start_time", (dev, lo, hi)).fetchall()
         if not runs:
             return []
@@ -719,10 +746,11 @@ def part_runs(cache_path, dev: str, lo: int, hi: int, exclude_ids=()) -> list[di
             "AND performance_impact = 'unplanned_stop' AND start_time >= ? AND start_time < ? ORDER BY start_time",
             (dev, runs[0][2], max(r[3] for r in runs))).fetchall()
     out = []
-    for part, job, st, en, run, unp, pln, ideal, cycles, day in runs:
+    for part, job, st, en, run, unp, pln, ideal, cycles, day, total_cycles in runs:
         out.append({"device_id": dev, "part": part, "job": job, "start": _ts(st), "end": _ts(en), "day": day,
                     "run_s": run or 0.0, "unp_s": unp or 0.0, "pln_s": pln or 0.0, "ideal_s": ideal or 0.0,
-                    "cycles": cycles or 0.0, "ict": (ideal / cycles) if cycles and cycles > 200 and ideal else None,
+                    "cycles": cycles or 0.0,
+                    "ict": (ideal / total_cycles) if cycles and cycles > 200 and ideal and total_cycles else None,
                     "down_s": 0.0, "flagged_n": 0, "flagged_s": 0.0, "reasons": {}})
     starts = [r["start"] for r in out]
     for eid, st, dur, reason in evs:
@@ -760,11 +788,12 @@ def part_days(cache_path, part: str) -> dict[str, list[int]]:
 
 
 def ict_history(cache_path, dev: str, part: str) -> list[dict]:
-    """Derived ideal cycle time (ideal_time / run_cycles) of every run over
-    200 cycles of this part on this line, all usable history, oldest first."""
+    """Derived ideal cycle time (ideal_time / total cycles; see cycles_sql) of every run over 200 run
+    cycles of this part on this line, all usable history, oldest first."""
     with closing(_ro(cache_path)) as db:
+        total, _ = cycles_sql(db)
         rows = db.execute(
-            "SELECT start_time, ideal_time / run_cycles, run_cycles FROM part_run x "
+            f"SELECT start_time, ideal_time / {total}, run_cycles FROM part_run x "
             "LEFT JOIN device_config_epoch e USING (device_id, config_epoch) "
             "WHERE device_id = ? AND part = ? AND x.deleted_at IS NULL AND COALESCE(e.usable, 1) = 1 "
             "AND run_cycles > 200 ORDER BY start_time", (dev, part)).fetchall()

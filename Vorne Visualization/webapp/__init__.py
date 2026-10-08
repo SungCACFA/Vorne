@@ -468,11 +468,13 @@ def create_app(config_path: str | Path = ROOT / "config.yaml") -> Flask:
             agg: dict[str, dict] = {}
             for r in pr:
                 a = agg.setdefault(r["part"] or "—", {"runs": 0, "run": 0.0, "ideal": 0.0, "cycles": 0.0,
-                                                       "stopped": 0.0, "t_runs": 0, "t_run": 0.0, "t_good": 0.0})
+                                                       "stopped": 0.0, "t_runs": 0, "t_run": 0.0, "t_good": 0.0,
+                                                       "basis": {}})
                 a["runs"] += 1
                 a["run"] += r["run_time"] or 0
                 a["ideal"] += r["ideal_time"] or 0
-                a["cycles"] += r["run_cycles"] or 0
+                a["cycles"] += r["cycles_total"] or 0         # total cycles: see data.cycles_sql
+                a["basis"][r["cycles_basis"]] = a["basis"].get(r["cycles_basis"], 0) + 1
                 a["stopped"] += (r["unplanned_stop_time"] or 0) + (r["planned_stop_time"] or 0)
                 if r["counts_trusted"]:
                     a["t_runs"] += 1
@@ -498,11 +500,17 @@ def create_app(config_path: str | Path = ROOT / "config.yaml") -> Flask:
                     "open": (dev, part) in open_by,
                 })
         rows.sort(key=lambda r: r["run"], reverse=True)
+        # where each run's total cycles came from (data.cycles_sql), said on the page
+        cycles_basis: dict[str, int] = {}
+        for r in rows:
+            for k, n in r["basis"].items():
+                cycles_basis[k] = cycles_basis.get(k, 0) + n
         part_runs.sort(key=lambda r: r["run_time"] or 0, reverse=True)
         job_runs.sort(key=lambda r: r["run_time"] or 0, reverse=True)
         return render_template(
             "products.html", **common(snap, win, "products", snap.devices),
             rows=rows, part_runs=part_runs, job_runs=job_runs, ict=ict, unit=unit, units=D.SAP_UNITS,
+            cycles_basis=cycles_basis,
             opens=opens, period_days=win.days(),
             imported=request.args.get("imported"), import_errors=request.args.getlist("err"),
         )

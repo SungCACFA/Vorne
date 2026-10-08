@@ -176,6 +176,24 @@ class SQLiteCache:
         self.db.executescript(_CONTROL)
         for spec in SPECS.values():
             self.db.executescript(fact_ddl(spec))
+        self.added_columns = self._add_missing_columns()
+
+    def _add_missing_columns(self) -> dict[str, list[str]]:
+        """CREATE TABLE IF NOT EXISTS leaves an existing table alone, so a field added to a channel later
+        needs its column added here. Each channel that gains one has its sync position cleared, so the
+        next refresh re-pulls its history and fills the new column (see ChannelSpec.backfill_columns)."""
+        added: dict[str, list[str]] = {}
+        for spec in SPECS.values():
+            have = {r[1] for r in self.db.execute(f"PRAGMA table_info({spec.table})")}
+            for f in spec.wanted:
+                col = spec.column(f)
+                if col not in have:
+                    self.db.execute(f"ALTER TABLE {spec.table} ADD COLUMN {col} {_SQL_TYPE[spec.kinds.get(f, NUM)]}")
+                    added.setdefault(spec.table, []).append(col)
+            if spec.table in added:
+                self.db.execute("UPDATE sync_state SET last_sync_id = NULL, last_record_order = NULL "
+                                "WHERE channel = ?", (spec.channel,))
+        return added
 
     # ------------------------------------------------------------- state
 
@@ -239,6 +257,10 @@ class SQLiteCache:
             + ", ".join(f"{c} = excluded.{c}" for c in updatable)
             + ", deleted_at = NULL, updated_at = excluded.updated_at "
             f"WHERE {t}.sync_id IS NULL OR excluded.sync_id > {t}.sync_id OR {t}.deleted_at IS NOT NULL"
+            # Fill a column added later, once: same version, and the same run (a production-day-filtered request
+            # returns a run clipped to its window, with prorated cycles - same sync_id, different numbers).
+            + "".join(f" OR (excluded.sync_id = {t}.sync_id AND excluded.run_cycles IS {t}.run_cycles "
+                      f"AND {t}.{c} IS NULL AND excluded.{c} IS NOT NULL)" for c in spec.backfill_columns)
         )
         now = _now()
         params = [{**{c: r.get(c) for c in cols}, "_now": now} for r in rows]
@@ -315,15 +337,16 @@ class SQLiteCache:
     # ---------------------------------------------------- part standards
 
     def refresh_part_standard(self) -> int:
-        """Median and spread of ideal_time / run_cycles per part, over runs
-        with run_cycles > 200 - what schema.sql's refresh_part_standard()
-        does in Postgres. Never touches the hand-entered columns."""
+        """Median and spread of ideal_time / total cycles per part (Vorne's Avg. Ideal Cycle Time), over
+        runs with run_cycles > 200 - what schema.sql's refresh_part_standard() does in Postgres. Never
+        touches the hand-entered columns."""
         import statistics
 
         with self._lock:
             per: dict[str, list[float]] = {}
             for part, ict in self.db.execute(
-                    "SELECT part, ideal_time / run_cycles FROM part_run "
+                    "SELECT part, ideal_time / COALESCE(total_cycles, run_cycles + COALESCE(small_stops, 0) "
+                    "+ partial_cycles, run_cycles + COALESCE(small_stops, 0)) FROM part_run "
                     "WHERE deleted_at IS NULL AND part IS NOT NULL AND run_cycles > 200"):
                 per.setdefault(part, []).append(ict)
             now = _now()
