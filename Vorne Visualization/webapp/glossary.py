@@ -500,7 +500,7 @@ DEFS: dict[str, Term] = {
         status='Not available from the devices.',
         why='Across 1,803 shifts on all four lines, crew size has never been entered once, so total labor is zero'
             ' everywhere and labor efficiency cannot be computed. Labour standards do exist on many parts — '
-            'earned labor is populated on 839 shifts — so the expectation is configured but no actuals are being '
+            'earned labor is populated on around 840 shifts — so the expectation is configured but no actuals are being '
             'captured. Labour hours must come from SAP. *(Danbro device data)*',
         section='Measures deliberately absent'),
 }
