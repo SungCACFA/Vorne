@@ -523,5 +523,4 @@ BRIEF.md       the project brief
 cache/         the SQLite cache (git-ignored; holds the only copy of the SAP standards)
 exports/       static HTML snapshots (git-ignored)
 analyze_*.py   one-off investigations (ICT nameplate, run length, AreaE singles, SAP units); run from this folder
-cache_pre_rebuild/  a copy of the cache from before a rebuild, committed with the overview page
 ```
