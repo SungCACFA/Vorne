@@ -311,7 +311,7 @@ def test_the_cautions_survive():
     """The cautions are the point. Spot-check that the findings they record are there in full."""
     ict = " ".join(GL.DEFS["derived_ict"].caution.split())
     assert "all four ADVIL variants return 0.54545455 s, which is 6/11 s: a rate of 6,600 cycles per hour" in ict
-    assert "FR8 ESTRADIOL is exactly 0.375 s across all 88 runs" in ict
+    assert "FR8 ESTRADIOL is exactly 0.375 s across every one of its runs, 88 when checked" in ict
     assert "XL's arithmetic is correct. Its count inputs are miswired." in GL.DEFS["quality"].why
     assert "Across more than 1,800 shifts on all four lines, crew size has never been entered once" in GL.DEFS["labour"].why
     assert "It was reporting schedule adherence, not asset use." in GL.DEFS["calendar_use"].caution

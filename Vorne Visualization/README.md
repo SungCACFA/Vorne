@@ -24,18 +24,43 @@ to an endpoint in Azure) swaps one class and nothing upstream.
 
 ## Setup
 
-Windows, Python 3.11 or later.
+Windows, Python 3.11 or later. The refresh and the live view need the plant LAN (the devices answer on plain HTTP at
+the addresses above); the tests, the app on an existing cache, and the export do not. The commands below run from
+the project folder (`Vorne Visualization`, a subfolder of the git repository).
 
 ```powershell
-cd "C:\...\Vorne Visualization"
+cd "C:\...\Vorne API\Vorne Visualization"
 python -m venv .venv
 .venv\Scripts\pip install -r requirements.txt
-.venv\Scripts\python -m xlpipe refresh        # first run backfills each device's full history: about 30 s
-.venv\Scripts\python -m webapp                # http://127.0.0.1:5000
+
+# 1. Fill the cache. The first run backfills each device's full history: about 30 s.
+.venv\Scripts\python -m xlpipe refresh
+.venv\Scripts\python verify.py                # optional: cache totals against the devices' own; exit 0 is a pass
+
+# 2. Run the app. Local only by default; --host 0.0.0.0 to serve the LAN (the plant copy runs on port 5057).
+.venv\Scripts\python -m webapp                # http://127.0.0.1:5000  (also /live, the products page, each line)
+.venv\Scripts\python -m webapp --host 0.0.0.0 --port 5057
+
+# 3. Check it. No device needed. The browser tests run in headless Edge and are skipped if Edge is not installed.
+.venv\Scripts\python -m pytest
+
+# 4. A snapshot to email or put on a share: exports\danbro_<date>_<time>.html, one file, opens offline.
+.venv\Scripts\python -m webapp export
 ```
 
-Devices, channels and configuration epochs are in `config.yaml`. There are no credentials until a database exists;
-when there are, they go in `.env`, which is git-ignored.
+**A new cache has no SAP standards.** SAP values and pieces per cycle are typed in on the products page and kept only
+in the cache. On a fresh cache, Load CSV from the last Export CSV; there is nothing to restore them from otherwise.
+
+Devices, channels, configuration epochs, chart thresholds and the live-view timings are in `config.yaml`. There are no
+credentials until a database exists; when there are, they go in `.env`, which is git-ignored.
+
+**Where to change things.**
+
+- A definition's wording: `GLOSSARY.md`, then the same text in `webapp/glossary.py` (see Tooltips and definitions).
+  `python -m pytest tests/test_explain.py` names any field where the two differ.
+- A threshold, a timing or a device: `config.yaml`.
+- Any code: run the tests, then `python tests/mutation_check.py --check` (instant), which says whether every
+  deliberate bug still lands on the line it names. If it reports STALE, `--pins` prints the new line and its pin.
 
 ## Commands
 
@@ -48,7 +73,7 @@ when there are, they go in `.env`, which is git-ignored.
 | `python verify.py` | Is the sync *correct*? Cache totals against the device's own aggregates, plus the data checks below. Exit 1 on any failure. |
 | `python -m webapp [--port N]` | The app. Reads the cache on every request, so a refresh shows on the next page load. Also runs the live writer for `/live` (`--no-live-writer` to leave it to a separate process). |
 | `python -m xlpipe live [--interval S]` | The live writer on its own: every device's real-time data into `current_state`, every 5 s. One writer at a time. |
-| `python -m webapp export [--out FILE] [--keep]` | A self-contained, read-only HTML snapshot of every page, product page and period (≈3 min, ≈2.6 MB). Deletes earlier exports in the same folder unless `--keep`. See below. |
+| `python -m webapp export [--out FILE] [--keep]` | A self-contained, read-only HTML snapshot of every page, product page and period (≈3 min, ≈2.8 MB). Deletes earlier exports in the same folder unless `--keep`. See below. |
 | `python -m pytest` | 407 tests, no device needed (≈4–7 min, most of it the export tests). |
 | `python tests/mutation_check.py` | Would the tests notice if the code were wrong? See Tests. |
 | `python preflight.py` | When there is a database path: DNS, TCP 5432, TLS, auth, permissions, latency, as separate steps. |
@@ -278,7 +303,8 @@ without scripts nothing changes.
 **The wording is GLOSSARY.md's**, word for word, in 45 entries: definition, formula, what it answers, where the
 definition comes from (Vorne Vocab, TN000406, the API reference, or Danbro device data), and the caution, which is
 the point of each entry. `tests/test_explain.py` parses GLOSSARY.md and fails if `glossary.py` differs from it in any
-field, or drops or adds an entry; change GLOSSARY.md first (`glossary.py`'s entries were generated from it). The
+field, or drops or adds an entry; change GLOSSARY.md first, then carry the same words into `glossary.py` by hand (its
+entries were generated from GLOSSARY.md once, by a script that is not kept in the repository). The
 text keeps its markup - code, bold, paragraphs - and an italic mention of another entry (*Small stops*) is a link to
 it. Entries that refer to each other also carry "See also" links, and a page lists every entry its terms refer to, so
 every link has a target. **OEE has a full section** (OEE, its three losses, OEE loss, fully productive time, hidden
@@ -491,6 +517,11 @@ tests/         pytest suite and recorded fixtures
 schema.sql     Postgres schema, views, roles (parked; parses, never applied)
 preflight.py   Azure connectivity check (parked)
 verify.py      correctness checks against the devices
-config.yaml    devices, channels, sync settings, configuration epochs
+config.yaml    devices, channels, sync settings, configuration epochs, chart thresholds, live-view timings
+GLOSSARY.md    the definitions, authoritative; webapp/glossary.py carries them word for word
 BRIEF.md       the project brief
+cache/         the SQLite cache (git-ignored; holds the only copy of the SAP standards)
+exports/       static HTML snapshots (git-ignored)
+analyze_*.py   one-off investigations (ICT nameplate, run length, AreaE singles, SAP units); run from this folder
+cache_pre_rebuild/  a copy of the cache from before a rebuild, committed with the overview page
 ```

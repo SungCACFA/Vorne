@@ -208,7 +208,7 @@ Availability and Performance are published on their own in the meantime,
 because both derive from time, which reconciles to the second.
 
 Note that OEE multiplies its three factors, so it is unforgiving. A quality
-figure of 1.48 does not make OEE slightly wrong; it makes it meaningless. It
+figure above 1.0 does not make OEE slightly wrong; it makes it meaningless. It
 also cannot be partially published — two of three factors is not an OEE.
 
 ### Availability loss
@@ -382,9 +382,10 @@ copied across every part — all four ADVIL variants return 0.54545455 s, which 
 6/11 s: a rate of 6,600 cycles per hour, entered once as the line's nameplate
 speed. OTRIVIN differs between AreaB and AreaD because the standard tracks the
 machine rather than the product. By total cycles every run of a part returns the
-identical value — FR8 ESTRADIOL is exactly 0.375 s across all 88 runs — which
-confirms it is a configured constant rather than a measurement. Every variance
-figure is only as good as this number. *(Danbro device data)*
+identical value — FR8 ESTRADIOL is exactly 0.375 s across every one of its
+runs, 88 when checked — which confirms it is a configured constant rather than
+a measurement. Every variance figure is only as good as this number. *(Danbro
+device data)*
 
 ### Actual s/cycle
 
@@ -651,7 +652,7 @@ place `reject count` is returning the same value as Vorne's **WIP Count**
 (in count − good count), which we confirmed holds on every row. That makes
 total count equal to in count, so Quality is computing good ÷ infeed rather
 than good ÷ produced, and exceeds 100% whenever the good-count sensor leads the
-infeed sensor. Negative rejects appear on 923 hourly records on FR8 and
+infeed sensor. Negative rejects appear on more than 900 hourly records on FR8 and
 roughly 400 on each of the other three lines.
 
 XL's arithmetic is correct. Its count inputs are miswired. *(Danbro device

@@ -227,9 +227,11 @@ def test_ict_tolerance_comes_from_config(replayed_cache, tmp_path):
     from webapp import create_app
 
     cfg = tmp_path / "c.yaml"
-    cfg.write_text(f"cache_path: {replayed_cache.as_posix()}\ncharts:\n  ict_change_tolerance: 0.05\n", encoding="utf-8")
-    h = create_app(cfg).test_client().get("/product/OTRIVIN?g=ytd&p=2026").get_data(as_text=True)
-    assert "class=changelab>reconfigured" not in h            # AreaB's step is 4%: inside a 5% band
+    cfg.write_text(f"cache_path: {replayed_cache.as_posix()}\ncharts:\n  ict_change_tolerance: 0.15\n", encoding="utf-8")
+    h = create_app(cfg).test_client().get("/product/REGAINE_5b_60ML_SINGLES?g=ytd&p=2026").get_data(as_text=True)
+    assert "<h2>Every run" in h                               # the page rendered, so the absence below means something
+    assert "class=changelab>reconfigured" not in h            # AreaE's 20 Apr step is -10%: inside a 15% band
+    # (at the default 3% it is marked: test_ict_reconfiguration_is_marked_and_explained)
 
 
 # ---------------------------------------- gaps found by the mutation check

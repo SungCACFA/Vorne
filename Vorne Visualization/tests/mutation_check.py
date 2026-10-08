@@ -347,7 +347,7 @@ MUTATIONS: list[tuple[str, str, str, str]] = [
      "{{ (r.seconds - f[1])|hrs }} h over", "{{ r.seconds|hrs }} h over"),
     # --- the glossary wording
     ("glossary: a caution trimmed, losing a finding", "webapp/glossary.py",
-     "'ESTRADIOL is exactly 0.375 s across all 88 runs — which confirms",
+     "'ESTRADIOL is exactly 0.375 s across every one of its runs, 88 when checked — which confirms",
      "'ESTRADIOL is close to 0.375 s on most runs — which confirms"),
     ("glossary: cross-referenced entries not on the page, so See also links go nowhere", "webapp/__init__.py",
      'for k in GL.with_references(g.get("terms_used", []))]', 'for k in g.get("terms_used", [])]'),
@@ -739,7 +739,7 @@ PINS: dict[str, str] = {
     'tiers: reduced motion still animates': 'c36f5343480c',
     'flag rows: the table no longer says what the charts leave out': 'e05e3786fa2a',
     "flag rows: the charts' figure stated without the excluded stop removed": '2f435a3f3bb2',
-    'glossary: a caution trimmed, losing a finding': '1470eca69b54',
+    'glossary: a caution trimmed, losing a finding': '6664f42a7f73',
     'glossary: cross-referenced entries not on the page, so See also links go nowhere': '6021b54fe9b9',
     'glossary: Quality, OEE and Labour not reachable from every page': '1dbaea894ca1',
     'glossary: formulas lose their code markup': '52adc390ede0',
