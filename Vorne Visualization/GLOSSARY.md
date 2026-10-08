@@ -675,7 +675,7 @@ why it is currently withheld.
 of production time multiplied by **Current Team Size**, entered by an operator.
 Labor Efficiency is earned labor ÷ total labor.
 
-**why it is unavailable:** Across 1,803 shifts on all four lines, crew size has
+**why it is unavailable:** Across more than 1,800 shifts on all four lines, crew size has
 never been entered once, so total labor is zero everywhere and labor efficiency
 cannot be computed. Labour standards do exist on many parts — earned labor is
 populated on around 840 shifts — so the expectation is configured but no actuals are
